@@ -4,55 +4,47 @@ ARGUS TI is an interactive threat-intelligence dashboard for exploring threat
 actors, campaigns, indicators of compromise (IOCs), ATT&CK techniques, and
 analytical reports.
 
-The project currently includes a standalone browser dashboard and a backend
-foundation built with FastAPI and SQLAlchemy. The bundled intelligence records
-are demonstration data and should not be treated as current operational
-reporting.
+The project includes a browser dashboard, a read-only FastAPI service,
+PostgreSQL-compatible persistence, source-aware ingestion workers, optional
+bearer authentication, and containerized development and production stacks.
 
-## Current capabilities
+The bundled records are demonstration data and must not be treated as current
+operational reporting.
+
+## Capabilities
 
 - Browse threat-actor profiles, aliases, confidence, and attribution
-- Explore campaigns by actor, sector, and activity status
+- Merge MITRE ATT&CK and Malpedia metadata into one actor profile
+- Preserve per-source external IDs, profile links, and last-sync timestamps
+- Explore campaigns by actor, sector, and status
 - Filter IP, domain, hash, and URL indicators
-- Review ATT&CK technique coverage
-- Display actor timelines and report metadata
-- Serve seeded data through a read-only REST API
-- Run locally with SQLite or with PostgreSQL through Docker Compose
+- Review ATT&CK technique coverage and report metadata
+- Load live API records with an automatic demonstration-data fallback
+- Audit ingestion attempts and item counts
+- Require bearer-token authentication for data endpoints
+- Run with SQLite locally or PostgreSQL through Docker
 
 ## Architecture
 
 ```text
-Threat-intelligence sources (planned)
-                  |
-                  v
-        Ingestion and validation
-                  |
-                  v
-             PostgreSQL
-                  |
-                  v
-          FastAPI REST API
-                  |
-                  v
-         ARGUS TI dashboard
+MITRE ATT&CK STIX       Malpedia actor API
+         \                  /
+          v                v
+       Source-aware ingestion and identity merge
+                         |
+                         v
+                    PostgreSQL
+                         |
+                         v
+                  FastAPI read API
+                         |
+                         v
+                ARGUS TI dashboard
 ```
 
-The frontend still uses embedded demonstration arrays. Connecting
-`index.html` to the API is the next integration milestone.
+## Quick start
 
-## Quick start: dashboard
-
-From the repository root, start a local static server:
-
-```bash
-python3 -m http.server 8000
-```
-
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000) in a browser.
-
-## Quick start: API
-
-Python 3.11 or newer is required.
+Start the API:
 
 ```bash
 cd backend
@@ -60,50 +52,63 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 cp .env.example .env
+alembic upgrade head
 uvicorn app.main:app --reload --port 8001
 ```
 
-Useful local URLs:
+In a second terminal, serve the dashboard:
 
-- API information: [http://127.0.0.1:8001](http://127.0.0.1:8001)
-- Interactive API documentation: [http://127.0.0.1:8001/docs](http://127.0.0.1:8001/docs)
-- Health check: [http://127.0.0.1:8001/api/health](http://127.0.0.1:8001/api/health)
+```bash
+python3 -m http.server 8000
+```
 
-The default development configuration creates and seeds a local SQLite
-database on first startup.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). API documentation is
+available at [http://127.0.0.1:8001/docs](http://127.0.0.1:8001/docs).
 
-## Run with PostgreSQL
+## Sync threat actors
 
-Docker Desktop or another Docker-compatible runtime is required.
+With the backend environment active, fetch and merge both official sources:
+
+```bash
+cd backend
+python -m app.worker --once --source all
+```
+
+You can sync only one source with `--source mitre` or `--source malpedia`.
+The default MITRE URL is the latest Enterprise ATT&CK STIX 2.1 bundle. The
+Malpedia actor metadata endpoints are public; an optional `MALPEDIA_API_TOKEN`
+is supported and is sent only by the backend.
+
+Source documentation:
+
+- [MITRE ATT&CK STIX data](https://github.com/mitre-attack/attack-stix-data)
+- [Malpedia API](https://malpedia.caad.fkie.fraunhofer.de/usage/api)
+
+## Docker development
 
 ```bash
 docker compose up --build
 ```
 
-This starts PostgreSQL and exposes the API on port `8001`.
+Include the scheduled MITRE and Malpedia sync worker with:
+
+```bash
+docker compose --profile ingestion up --build
+```
 
 ## API endpoints
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/health` | Verify API and database availability |
-| `GET` | `/api/actors` | List and filter threat actors |
-| `GET` | `/api/actors/{actor_id}` | Retrieve a detailed actor profile |
+| `GET` | `/api/dashboard/bootstrap` | Load the complete dashboard contract |
+| `GET` | `/api/actors` | List threat actors and their source profiles |
+| `GET` | `/api/actors/{actor_id}` | Retrieve a merged actor profile |
 | `GET` | `/api/campaigns` | List campaigns by actor or status |
 | `GET` | `/api/iocs` | List and filter indicators |
 | `GET` | `/api/attack/techniques` | List ATT&CK techniques |
 | `GET` | `/api/reports` | List report metadata |
-
-## Database migrations
-
-From the `backend` directory:
-
-```bash
-alembic upgrade head
-```
-
-Production deployments should apply migrations before starting the API and
-set `SEED_ON_STARTUP=false` after loading approved data.
+| `GET` | `/api/ingestion/runs` | Review ingestion history |
 
 ## Tests
 
@@ -112,42 +117,35 @@ cd backend
 pytest
 ```
 
-The test suite covers health checks, seeded actor data, actor details,
-campaign and IOC filters, ATT&CK techniques, and reports.
+The suite covers the API, seed collections, filters, authentication, frontend
+contract, STIX normalization, source-aware actor merging, audit records, and
+idempotent ingestion.
 
 ## Project structure
 
 ```text
 .
-├── index.html                 # Current standalone dashboard
-├── BACKEND.md                 # Detailed backend instructions
-├── docker-compose.yml         # API and PostgreSQL services
+├── index.html
+├── BACKEND.md
+├── DEPLOYMENT.md
+├── docker-compose.yml
+├── docker-compose.production.yml
+├── deploy/
 └── backend/
-    ├── app/                   # FastAPI application and data models
-    ├── alembic/               # Database migrations
-    ├── tests/                 # API tests
-    ├── .env.example           # Local configuration template
-    ├── Dockerfile
-    └── pyproject.toml
+    ├── app/
+    ├── alembic/
+    └── tests/
 ```
 
-## Security and data-quality notes
+## Security and data quality
 
-- Bundled records are seed data for development and demonstration.
-- Validate attribution, timestamps, and provenance before operational use.
-- Treat indicators as potentially harmful data; do not automatically visit
-  URLs or execute referenced files.
-- Keep API keys and database credentials in `.env` or a managed secret store.
-- The current API is read-only and does not yet implement authentication.
-- Restrict CORS origins and disable automatic seeding in production.
+- Validate attribution, timestamps, confidence, and provenance before use.
+- Do not automatically visit indicators or execute referenced files.
+- Keep API tokens and database credentials out of Git and in a secret store.
+- Malpedia credentials are backend-only and are never sent to the dashboard.
+- Enable authentication, TLS, restricted CORS, and outbound allowlists in production.
+- Set `SEED_ON_STARTUP=false` before loading approved production data.
+- Back up PostgreSQL and monitor health and failed ingestion runs.
 
-## Roadmap
-
-- Replace frontend arrays with API requests
-- Add source-backed ingestion and normalization
-- Preserve record-level provenance and confidence history
-- Add authentication and role-based authorization
-- Add pagination, audit logging, and rate limiting
-- Add deployment and monitoring workflows
-
-See [BACKEND.md](BACKEND.md) for additional backend setup details.
+See [BACKEND.md](BACKEND.md) for API and worker instructions and
+[DEPLOYMENT.md](DEPLOYMENT.md) for production deployment.

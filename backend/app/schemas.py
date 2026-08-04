@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class APIModel(BaseModel):
@@ -23,6 +23,13 @@ class EventOut(APIModel):
     detail: str
 
 
+class ActorSourceOut(APIModel):
+    source_name: str
+    external_id: str
+    profile_url: str | None
+    last_synced_at: datetime | None
+
+
 class ActorSummary(APIModel):
     id: str
     name: str
@@ -32,6 +39,8 @@ class ActorSummary(APIModel):
     motivation: str
     severity: str
     confidence: str
+    external_id: str | None = None
+    source_profiles: list[ActorSourceOut] = Field(default_factory=list)
 
 
 class ActorDetail(ActorSummary):
@@ -70,6 +79,25 @@ class ReportOut(APIModel):
     published_at: datetime
     format: str
     url: str | None
+
+
+class IngestionRunOut(APIModel):
+    id: int
+    source_id: int
+    started_at: datetime
+    completed_at: datetime | None
+    status: str
+    items_seen: int
+    items_written: int
+    error: str | None
+
+
+class DashboardBootstrap(BaseModel):
+    actors: list[ActorDetail]
+    campaigns: list[CampaignOut]
+    indicators: list[IndicatorOut]
+    techniques: list[TechniqueOut]
+    reports: list[ReportOut]
 
 
 class HealthOut(BaseModel):

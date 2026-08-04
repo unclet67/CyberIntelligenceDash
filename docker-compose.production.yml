@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cyberintel
+      POSTGRES_USER: cyberintel
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - cyberintel_production_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cyberintel -d cyberintel"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://cyberintel:${POSTGRES_PASSWORD}@db:5432/cyberintel
+      CORS_ORIGINS: ""
+      SEED_ON_STARTUP: "false"
+      AUTH_REQUIRED: "true"
+      API_AUTH_TOKEN: ${API_AUTH_TOKEN:?set API_AUTH_TOKEN}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker", "--source", "all"]
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://cyberintel:${POSTGRES_PASSWORD}@db:5432/cyberintel
+      MITRE_STIX_URL: ${MITRE_STIX_URL:-https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json}
+      MALPEDIA_BASE_URL: ${MALPEDIA_BASE_URL:-https://malpedia.caad.fkie.fraunhofer.de}
+      MALPEDIA_API_TOKEN: ${MALPEDIA_API_TOKEN:-}
+      INGESTION_INTERVAL_SECONDS: ${INGESTION_INTERVAL_SECONDS:-3600}
+    depends_on:
+      api:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/frontend.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PUBLIC_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  cyberintel_production_data:

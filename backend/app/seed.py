@@ -71,14 +71,30 @@ TECHNIQUES = [
     ("T1486", "Data Encrypted for Impact", "Impact"),
 ]
 
+REPORTS = [
+    ("APT28 — Actor Profile", "Actor Profile", "APT28", "2026-07-30", "PDF"),
+    ("Operation Frostline — Campaign Brief", "Campaign Brief", "Operation Frostline", "2026-07-29", "PDF"),
+    ("Energy Sector Exposure Assessment", "Sector Assessment", "Energy", "2026-07-24", "DOCX"),
+    ("APT41 — Actor Profile", "Actor Profile", "APT41", "2026-07-18", "PDF"),
+    ("Q3 ATT&CK Coverage Summary", "Coverage Report", "All Actors", "2026-07-10", "PDF"),
+    ("Operation Ledgerfall — Campaign Brief", "Campaign Brief", "Operation Ledgerfall", "2026-06-29", "DOCX"),
+    ("APT29 — Actor Profile", "Actor Profile", "APT29", "2026-06-22", "PDF"),
+    ("Scattered Spider — IOC Feed Export", "IOC Feed", "SCATTERED SPIDER", "2026-06-15", "CSV"),
+]
+
 
 def seed_database(session: Session) -> bool:
     if session.scalar(select(func.count()).select_from(Actor)):
         return False
 
     sources = {name: Source(name=name) for name in {row[4] for row in INDICATORS}}
+    demo_source = Source(name="ARGUS TI Demonstration Data")
+    sources[demo_source.name] = demo_source
     session.add_all(sources.values())
-    techniques = {item[0]: Technique(id=item[0], name=item[1], tactic=item[2]) for item in TECHNIQUES}
+    techniques = {
+        item[0]: Technique(id=item[0], name=item[1], tactic=item[2], external_id=f"demo:{item[0]}")
+        for item in TECHNIQUES
+    }
     session.add_all(techniques.values())
 
     actors: dict[str, Actor] = {}
@@ -93,6 +109,8 @@ def seed_database(session: Session) -> bool:
             severity=severity,
             confidence=confidence,
             description=f"Seed profile for {name}; replace with source-backed production reporting.",
+            external_id=f"demo:{actor_id}",
+            source=demo_source,
             aliases=[ActorAlias(name=alias) for alias in aliases],
         )
         actors[actor_id] = actor
@@ -101,48 +119,51 @@ def seed_database(session: Session) -> bool:
     actors["a1"].techniques.extend([techniques["T1566.001"], techniques["T1059.001"], techniques["T1027"], techniques["T1071.001"]])
     actors["a3"].techniques.extend([techniques["T1195.002"], techniques["T1105"]])
     actors["a4"].techniques.extend([techniques["T1566.002"], techniques["T1486"]])
-    actors["a1"].events.append(ActorEvent(
-        observed_at=datetime(2026, 7, 29, tzinfo=timezone.utc),
-        title="New C2 infrastructure identified",
-        detail="Demonstration timeline event imported from the standalone dashboard.",
-    ))
+    actors["a1"].events.append(
+        ActorEvent(
+            observed_at=datetime(2026, 7, 29, tzinfo=timezone.utc),
+            title="New C2 infrastructure identified",
+            detail="Demonstration timeline event imported from the standalone dashboard.",
+        )
+    )
 
     for campaign_id, name, actor_id, sector, status, first_seen in CAMPAIGNS:
-        session.add(Campaign(
-            id=campaign_id,
-            name=name,
-            actor_id=actor_id,
-            sector=sector,
-            status=status,
-            first_seen=date.fromisoformat(first_seen),
-        ))
+        session.add(
+            Campaign(
+                id=campaign_id,
+                name=name,
+                actor_id=actor_id,
+                sector=sector,
+                status=status,
+                first_seen=date.fromisoformat(first_seen),
+            )
+        )
 
     observed = datetime(2026, 7, 30, tzinfo=timezone.utc)
-    for indicator_type, value, actor_id, confidence, source_name in INDICATORS:
-        session.add(Indicator(
-            type=indicator_type,
-            value=value,
-            actor_id=actor_id,
-            source=sources[source_name],
-            confidence=confidence,
-            first_seen=observed,
-            last_seen=observed,
-        ))
+    for number, (indicator_type, value, actor_id, confidence, source_name) in enumerate(INDICATORS, start=1):
+        session.add(
+            Indicator(
+                type=indicator_type,
+                value=value,
+                external_id=f"demo:ioc:{number}",
+                actor_id=actor_id,
+                source=sources[source_name],
+                confidence=confidence,
+                first_seen=observed,
+                last_seen=observed,
+            )
+        )
 
-    reports = [
-        ("APT28 — Actor Profile", "Actor Profile", "APT28", "PDF"),
-        ("Operation Frostline — Campaign Brief", "Campaign Brief", "Operation Frostline", "PDF"),
-        ("Energy Sector Exposure Assessment", "Sector Assessment", "Energy", "DOCX"),
-        ("Q3 ATT&CK Coverage Summary", "Coverage Report", "All Actors", "PDF"),
-    ]
-    for title, report_type, related, report_format in reports:
-        session.add(Report(
-            title=title,
-            type=report_type,
-            related=related,
-            published_at=observed,
-            format=report_format,
-        ))
+    for title, report_type, related, published, report_format in REPORTS:
+        session.add(
+            Report(
+                title=title,
+                type=report_type,
+                related=related,
+                published_at=datetime.fromisoformat(published).replace(tzinfo=timezone.utc),
+                format=report_format,
+            )
+        )
 
     session.commit()
     return True

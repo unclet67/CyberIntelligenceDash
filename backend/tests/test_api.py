@@ -1,3 +1,6 @@
+from app.config import settings
+
+
 def test_health(client):
     response = client.get("/api/health")
     assert response.status_code == 200
@@ -30,8 +33,35 @@ def test_filters_campaigns_and_indicators(client):
     assert all(item["source_name"] for item in indicators.json())
 
 
-def test_lists_techniques_and_reports(client):
-    techniques = client.get("/api/attack/techniques")
-    reports = client.get("/api/reports")
-    assert techniques.status_code == 200 and techniques.json()
-    assert reports.status_code == 200 and reports.json()
+def test_bootstrap_contains_complete_demo_collections(client):
+    response = client.get("/api/dashboard/bootstrap")
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["actors"]) == 12
+    assert len(payload["campaigns"]) == 17
+    assert len(payload["indicators"]) == 12
+    assert len(payload["reports"]) == 8
+    assert payload["techniques"]
+
+
+def test_lists_techniques_reports_and_ingestion_runs(client):
+    assert client.get("/api/attack/techniques").json()
+    assert client.get("/api/reports").json()
+    response = client.get("/api/ingestion/runs")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_optional_bearer_authentication(client):
+    original_required = settings.auth_required
+    original_token = settings.api_auth_token
+    settings.auth_required = True
+    settings.api_auth_token = "test-secret"
+    try:
+        assert client.get("/api/health").status_code == 200
+        assert client.get("/api/actors").status_code == 401
+        response = client.get("/api/actors", headers={"Authorization": "Bearer test-secret"})
+        assert response.status_code == 200
+    finally:
+        settings.auth_required = original_required
+        settings.api_auth_token = original_token
