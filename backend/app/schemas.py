@@ -32,6 +32,7 @@ class ActorSummary(APIModel):
     motivation: str
     severity: str
     confidence: str
+    external_id: str | None = None
 
 
 class ActorDetail(ActorSummary):
@@ -70,6 +71,25 @@ class ReportOut(APIModel):
     published_at: datetime
     format: str
     url: str | None
+
+
+class IngestionRunOut(APIModel):
+    id: int
+    source_id: int
+    started_at: datetime
+    completed_at: datetime | None
+    status: str
+    items_seen: int
+    items_written: int
+    error: str | None
+
+
+class DashboardBootstrap(BaseModel):
+    actors: list[ActorDetail]
+    campaigns: list[CampaignOut]
+    indicators: list[IndicatorOut]
+    techniques: list[TechniqueOut]
+    reports: list[ReportOut]
 
 
 class HealthOut(BaseModel):

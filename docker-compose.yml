@@ -19,10 +19,23 @@ services:
       DATABASE_URL: postgresql+psycopg://cyberintel:cyberintel-local@db:5432/cyberintel
       CORS_ORIGINS: http://localhost:8000,http://127.0.0.1:8000
       SEED_ON_STARTUP: "true"
+      AUTH_REQUIRED: "false"
     ports:
       - "8001:8001"
     depends_on:
       db:
+        condition: service_healthy
+
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    profiles: ["ingestion"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://cyberintel:cyberintel-local@db:5432/cyberintel
+      STIX_FEED_URL: ${STIX_FEED_URL:-}
+      INGESTION_INTERVAL_SECONDS: ${INGESTION_INTERVAL_SECONDS:-3600}
+    depends_on:
+      api:
         condition: service_healthy
 
 volumes:

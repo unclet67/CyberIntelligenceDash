@@ -1,10 +1,10 @@
-# ARGUS TI backend foundation
+# ARGUS TI backend
 
-This directory adds a read-only API and PostgreSQL-ready data layer to the
-standalone dashboard. SQLite is the default for a zero-setup local run;
-Docker Compose uses PostgreSQL.
+The backend provides a read-only FastAPI service, PostgreSQL-compatible data
+models, versioned migrations, seeded demonstration records, optional bearer
+authentication, and a STIX ingestion worker.
 
-## Local development
+## Local API
 
 ```bash
 cd backend
@@ -12,19 +12,15 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 cp .env.example .env
+alembic upgrade head
 uvicorn app.main:app --reload --port 8001
 ```
 
-Open `http://127.0.0.1:8001/docs` for the interactive API documentation.
-The database is created and seeded on first startup.
+Open `http://127.0.0.1:8001/docs` for interactive API documentation. The
+dashboard served on port `8000` automatically loads `/api/dashboard/bootstrap`
+and falls back to its bundled demonstration arrays when the API is unavailable.
 
-Run tests with:
-
-```bash
-pytest
-```
-
-## PostgreSQL with Docker
+## PostgreSQL development stack
 
 From the repository root:
 
@@ -32,28 +28,65 @@ From the repository root:
 docker compose up --build
 ```
 
-The API will be available at `http://127.0.0.1:8001`.
+The API is available at `http://127.0.0.1:8001`.
 
-## Database migrations
+## STIX ingestion worker
 
-Run migrations from `backend/` after setting `DATABASE_URL`:
+Ingest one local STIX 2.1 bundle:
 
 ```bash
-alembic upgrade head
+cd backend
+python -m app.worker --once --file /path/to/bundle.json
 ```
 
-For production, use migrations before starting the service and set
-`SEED_ON_STARTUP=false` after loading approved data.
+Ingest one remote bundle:
+
+```bash
+python -m app.worker --once --url https://approved.example/bundle.json
+```
+
+To run the scheduled development worker, set `STIX_FEED_URL` and use:
+
+```bash
+docker compose --profile ingestion up --build
+```
+
+The worker upserts intrusion sets, ATT&CK techniques, indicators, and `uses`
+relationships. Every attempt is recorded in `ingestion_runs` with status and
+item counts.
+
+## Authentication
+
+Development is unauthenticated by default. To require a bearer token:
+
+```dotenv
+AUTH_REQUIRED=true
+API_AUTH_TOKEN=replace-with-a-long-random-token
+```
+
+The health endpoint remains public. Data endpoints require
+`Authorization: Bearer <token>`. The dashboard asks for the token after a 401
+response and keeps it in browser session storage only.
 
 ## API surface
 
 - `GET /api/health`
+- `GET /api/dashboard/bootstrap`
 - `GET /api/actors`
 - `GET /api/actors/{actor_id}`
 - `GET /api/campaigns`
 - `GET /api/iocs`
 - `GET /api/attack/techniques`
 - `GET /api/reports`
+- `GET /api/ingestion/runs`
 
-The next integration step is replacing the hard-coded arrays in `index.html`
-with requests to these endpoints.
+## Migrations and tests
+
+```bash
+cd backend
+alembic upgrade head
+pytest
+```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the production Compose stack and
+operational requirements.
