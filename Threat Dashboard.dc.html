@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body{margin:0;background:#f5f6f8;font-family:'IBM Plex Sans',sans-serif;color:#111827;-webkit-font-smoothing:antialiased}
+    a{color:#4338ca;text-decoration:none}
+    a:hover{color:#3730a3;text-decoration:underline}
+    *{box-sizing:border-box}
+    ::-webkit-scrollbar{width:8px;height:8px}
+    ::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:4px}
+    @keyframes pulseRing{0%{transform:scale(0.6);opacity:.7}100%{transform:scale(2.2);opacity:0}}
+  </style>
+</helmet>
+<div style="display:flex;height:100vh;width:100%;overflow:hidden">
+
+  <!-- SIDEBAR -->
+  <div style="width:236px;flex:none;background:#ffffff;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;padding:20px 14px">
+    <div style="display:flex;align-items:center;gap:9px;padding:6px 8px 22px">
+      <div style="width:30px;height:30px;border-radius:7px;background:{{ accentColor }};display:flex;align-items:center;justify-content:center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg>
+      </div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;letter-spacing:-0.2px">ARGUS<span style="color:{{ accentColor }}">TI</span></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="{{ navOverviewStyle }}" onClick="{{ goToDashboard }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>
+        <span>Overview</span>
+      </div>
+      <div style="{{ navActorsStyle }}" onClick="{{ goToActors }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path></svg>
+        <span>Threat Actors</span>
+      </div>
+      <div style="{{ navCampaignsStyle }}" onClick="{{ goToCampaigns }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15l4-8 4 5 3-4 5 9"></path></svg>
+        <span>Campaigns</span>
+      </div>
+      <div style="{{ navIocStyle }}" onClick="{{ goToIocs }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="6"></circle><path d="M20 20l-5.5-5.5"></path></svg>
+        <span>IOC Search</span>
+      </div>
+      <div style="{{ navAttackStyle }}" onClick="{{ goToAttack }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M3 15h18M9 3v18M15 3v18"></path></svg>
+        <span>ATT&amp;CK Matrix</span>
+      </div>
+      <div style="{{ navGeoStyle }}" onClick="{{ goToGeo }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.5 2.5 2.5 15.5 0 18M12 3c-2.5 2.5-2.5 15.5 0 18"></path></svg>
+        <span>Geo Map</span>
+      </div>
+      <div style="{{ navReportsStyle }}" onClick="{{ goToReports }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l3 3v15H6z"></path><path d="M9 12h6M9 16h6"></path></svg>
+        <span>Reports</span>
+      </div>
+    </div>
+    <div style="margin-top:auto;padding:14px 10px;border-top:1px solid #f0f1f3;display:flex;flex-direction:column;gap:3px">
+      <div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em">Signed in as</div>
+      <div style="display:flex;align-items:center;gap:8px;padding-top:4px">
+        <div style="width:28px;height:28px;border-radius:50%;background:#eef2ff;color:#4338ca;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif">MK</div>
+        <div style="font-size:13px;font-weight:500">M. Kovac</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div style="flex:1;display:flex;flex-direction:column;min-width:0;height:100%">
+
+    <!-- TOPBAR -->
+    <div style="height:64px;flex:none;border-bottom:1px solid #e5e7eb;background:#ffffff;display:flex;align-items:center;padding:0 28px;gap:20px">
+      <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:10px;cursor:pointer" onClick="{{ goBack }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          <span style="font-size:13px;color:#6b7280">Threat Actors</span>
+          <span style="font-size:13px;color:#d1d5db">/</span>
+          <span style="font-size:13px;color:#111827;font-weight:600">{{ selectedActor.name }}</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isActors }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:10px;cursor:pointer" onClick="{{ goToDashboard }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          <span style="font-size:13px;color:#6b7280">Overview</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isIocs }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:10px;cursor:pointer" onClick="{{ goToDashboard }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          <span style="font-size:13px;color:#6b7280">Overview</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isAttack }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:10px;cursor:pointer" onClick="{{ goToDashboard }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          <span style="font-size:13px;color:#6b7280">Overview</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isCampaign }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:10px;cursor:pointer" onClick="{{ goToDashboard }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          <span style="font-size:13px;color:#6b7280">Overview</span>
+          <span style="font-size:13px;color:#d1d5db">/</span>
+          <span style="font-size:13px;color:#111827;font-weight:600">{{ selectedCampaign.name }}</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isReports }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:10px;cursor:pointer" onClick="{{ goToDashboard }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          <span style="font-size:13px;color:#6b7280">Overview</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isCampaignsList }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:10px;cursor:pointer" onClick="{{ goToDashboard }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          <span style="font-size:13px;color:#6b7280">Overview</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isGeo }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:10px;cursor:pointer" onClick="{{ goToDashboard }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          <span style="font-size:13px;color:#6b7280">Overview</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:17px">Overview</div>
+      </sc-if>
+      <sc-if value="{{ isIocs }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:17px">IOC Search</div>
+      </sc-if>
+      <sc-if value="{{ isActors }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:17px">Threat Actors</div>
+      </sc-if>
+      <sc-if value="{{ isAttack }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:17px">ATT&amp;CK Coverage Matrix</div>
+      </sc-if>
+      <sc-if value="{{ isReports }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:17px">Reports</div>
+      </sc-if>
+      <sc-if value="{{ isCampaignsList }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:17px">Campaigns</div>
+      </sc-if>
+      <sc-if value="{{ isGeo }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:17px">Geo Map</div>
+      </sc-if>
+      <div style="flex:1;display:flex;justify-content:center;max-width:520px;margin:0 auto">
+        <div style="width:100%;display:flex;align-items:center;gap:8px;background:#f5f6f8;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <span style="font-size:13px;color:#9ca3af">Search actors, IOCs, CVEs, campaigns…</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.8"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+        <div style="width:30px;height:30px;border-radius:50%;background:#111827;color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif">MK</div>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div style="flex:1;overflow:auto;padding:28px 32px 48px">
+
+      <!-- DASHBOARD VIEW -->
+      <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+        <div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px">
+            <div>
+              <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.3px">Threat Landscape</div>
+              <div style="font-size:13px;color:#6b7280;margin-top:4px">Last updated 12 minutes ago · Global visibility</div>
+            </div>
+          </div>
+
+          <!-- KPI ROW -->
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px">
+            <sc-for list="{{ kpis }}" as="kpi" hint-placeholder-count="4">
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 2px rgba(16,24,40,0.04)">
+                <div style="font-size:12.5px;color:#6b7280;font-weight:500">{{ kpi.label }}</div>
+                <div style="font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700">{{ kpi.value }}</div>
+                <div style="font-size:12px;color:{{ kpi.deltaColor }};font-weight:500">{{ kpi.delta }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- GEO + TOP ACTORS -->
+          <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:20px;align-items:stretch">
+            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px;box-shadow:0 1px 2px rgba(16,24,40,0.04)">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+                <div style="font-size:14px;font-weight:600">Global Activity</div>
+                <div style="font-size:12px;color:#9ca3af">Last 24 hours</div>
+              </div>
+              <div style="position:relative;height:260px;border-radius:8px;background:
+                  linear-gradient(#eef0f3 1px, transparent 1px) 0 0/100% 13%,
+                  linear-gradient(90deg,#eef0f3 1px, transparent 1px) 0 0/8.3% 100%,
+                  #fafbfc;border:1px solid #eef0f3;overflow:hidden">
+                <sc-for list="{{ geoMarkers }}" as="m" hint-placeholder-count="6">
+                  <div style="{{ m.wrapStyle }}">
+                    <div style="{{ m.ringStyle }}"></div>
+                    <div style="{{ m.dotStyle }}"></div>
+                    <div style="{{ m.labelStyle }}">{{ m.label }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;gap:18px;margin-top:14px">
+                <sc-for list="{{ geoLegend }}" as="lg" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#6b7280">
+                    <div style="{{ lg.dotStyle }}"></div>{{ lg.label }}
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px;box-shadow:0 1px 2px rgba(16,24,40,0.04);display:flex;flex-direction:column">
+              <div style="font-size:14px;font-weight:600;margin-bottom:14px">Top Threat Actors</div>
+              <div style="display:flex;flex-direction:column;gap:2px;flex:1">
+                <sc-for list="{{ actors }}" as="actor" hint-placeholder-count="6">
+                  <div style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:7px;cursor:pointer" onClick="{{ actor.onClick }}" style-hover="background:#f9fafb">
+                    <div style="{{ actor.sevDotStyle }}"></div>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:13px;font-weight:600;font-family:'Space Grotesk',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ actor.name }}</div>
+                      <div style="font-size:11.5px;color:#9ca3af">{{ actor.country }} · {{ actor.motivation }}</div>
+                    </div>
+                    <div style="font-size:11px;color:#9ca3af;white-space:nowrap">{{ actor.campaigns }} campaigns</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <!-- ATTACK MATRIX + IOC SEARCH -->
+          <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:20px;align-items:start">
+            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px;box-shadow:0 1px 2px rgba(16,24,40,0.04)">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <div style="font-size:14px;font-weight:600">MITRE ATT&CK Coverage</div>
+                <div style="display:flex;align-items:center;gap:10px;font-size:11.5px;color:#9ca3af">
+                  <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#e5e7eb;display:inline-block"></span>None</span>
+                  <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#c7d2fe;display:inline-block"></span>Low</span>
+                  <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#818cf8;display:inline-block"></span>Med</span>
+                  <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#4338ca;display:inline-block"></span>High</span>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">
+                <sc-for list="{{ tactics }}" as="tac" hint-placeholder-count="6">
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="font-size:11px;font-weight:600;color:#374151;text-align:center;height:28px;display:flex;align-items:center;justify-content:center;line-height:1.15">{{ tac.name }}</div>
+                    <sc-for list="{{ tac.techniques }}" as="tech" hint-placeholder-count="4">
+                      <div style="{{ tech.cellStyle }}" title="{{ tech.name }}"></div>
+                    </sc-for>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px;box-shadow:0 1px 2px rgba(16,24,40,0.04)">
+              <div style="font-size:14px;font-weight:600;margin-bottom:12px">IOC Search</div>
+              <div style="display:flex;align-items:center;gap:8px;background:#f5f6f8;border:1px solid #e5e7eb;border-radius:7px;padding:8px 10px;margin-bottom:14px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                <span style="font-size:12.5px;color:#9ca3af;font-family:'IBM Plex Mono',monospace">185.220.101.x</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <sc-for list="{{ iocs }}" as="ioc" hint-placeholder-count="5">
+                  <div style="display:flex;flex-direction:column;gap:3px;padding-bottom:9px;border-bottom:1px solid #f3f4f6">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <span style="font-size:11px;font-weight:600;color:{{ ioc.typeColor }}">{{ ioc.type }}</span>
+                      <span style="{{ ioc.confStyle }}">{{ ioc.confidence }}</span>
+                    </div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ ioc.value }}</div>
+                    <div style="font-size:11px;color:#9ca3af">linked to {{ ioc.actor }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <!-- CAMPAIGNS TABLE -->
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 1px 2px rgba(16,24,40,0.04);overflow:hidden">
+            <div style="font-size:14px;font-weight:600;padding:18px 20px 14px">Active Campaigns</div>
+            <div style="display:grid;grid-template-columns:1.8fr 1.4fr 1.2fr 1fr 1fr;padding:0 20px 10px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em">
+              <div>Campaign</div><div>Attributed Actor</div><div>Target Sector</div><div>Status</div><div>Last Activity</div>
+            </div>
+            <sc-for list="{{ campaigns }}" as="camp" hint-placeholder-count="5">
+              <div style="display:grid;grid-template-columns:1.8fr 1.4fr 1.2fr 1fr 1fr;padding:13px 20px;border-top:1px solid #f3f4f6;align-items:center;font-size:13px;cursor:pointer" onClick="{{ camp.onClick }}" style-hover="background:#f9fafb">
+                <div style="font-weight:500">{{ camp.name }}</div>
+                <div style="{{ camp.actorLinkStyle }}">{{ camp.actor }}</div>
+                <div style="color:#6b7280">{{ camp.sector }}</div>
+                <div><span style="{{ camp.statusStyle }}">{{ camp.status }}</span></div>
+                <div style="color:#9ca3af">{{ camp.lastActivity }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- THREAT ACTORS LIST VIEW -->
+      <sc-if value="{{ isActors }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:9px 14px;flex:1;max-width:340px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+              <input value="{{ actorSearchValue }}" onChange="{{ setActorSearch }}" placeholder="Search by name, alias, or country…" style="border:none;outline:none;font-size:13px;flex:1;font-family:'IBM Plex Sans',sans-serif;color:#111827"/>
+            </div>
+            <div style="font-size:13px;color:#6b7280;white-space:nowrap">{{ actorsFiltered.length }} of {{ actors.length }} actors</div>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
+            <sc-for list="{{ severityChips }}" as="chip" hint-placeholder-count="5">
+              <div style="{{ chip.chipStyle }}" onClick="{{ chip.onClick }}">{{ chip.name }}</div>
+            </sc-for>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px">
+            <sc-for list="{{ actorsFiltered }}" as="actor" hint-placeholder-count="6">
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:18px;box-shadow:0 1px 2px rgba(16,24,40,0.04);cursor:pointer;display:flex;gap:14px" onClick="{{ actor.onClick }}" style-hover="border-color:#c7d2fe">
+                <div style="{{ actor.sevAvatarStyle }}">{{ actor.initials }}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                    <div style="font-size:14.5px;font-weight:600;font-family:'Space Grotesk',sans-serif">{{ actor.name }}</div>
+                    <span style="{{ actor.sevBadgeStyle }}">{{ actor.severity }}</span>
+                  </div>
+                  <div style="font-size:12px;color:#9ca3af;margin:4px 0 10px">{{ actor.country }} · {{ actor.sponsor }} · {{ actor.motivation }}</div>
+                  <div style="display:flex;gap:16px;font-size:11.5px;color:#6b7280">
+                    <span>{{ actor.campaigns }} campaigns</span>
+                    <span>{{ actor.iocs.length }} IOCs</span>
+                    <span>{{ actor.techniques }} techniques</span>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- CAMPAIGNS LIST VIEW -->
+      <sc-if value="{{ isCampaignsList }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="margin-bottom:16px">
+            <div style="font-size:13px;color:#6b7280">{{ campaignsFull.length }} tracked campaigns</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 1px 2px rgba(16,24,40,0.04);overflow:hidden">
+            <div style="display:grid;grid-template-columns:1.8fr 1.4fr 1.2fr 1fr 1fr;padding:14px 20px 10px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em">
+              <div>Campaign</div><div>Attributed Actor</div><div>Target Sector</div><div>Status</div><div>Last Activity</div>
+            </div>
+            <sc-for list="{{ campaignsFull }}" as="camp" hint-placeholder-count="10">
+              <div style="display:grid;grid-template-columns:1.8fr 1.4fr 1.2fr 1fr 1fr;padding:13px 20px;border-top:1px solid #f3f4f6;align-items:center;font-size:13px;cursor:pointer" onClick="{{ camp.onClick }}" style-hover="background:#f9fafb">
+                <div style="font-weight:500">{{ camp.name }}</div>
+                <div style="{{ camp.actorLinkStyle }}">{{ camp.actor }}</div>
+                <div style="color:#6b7280">{{ camp.sector }}</div>
+                <div><span style="{{ camp.statusStyle }}">{{ camp.status }}</span></div>
+                <div style="color:#9ca3af">{{ camp.lastActivity }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- GEO MAP FULL PAGE -->
+      <sc-if value="{{ isGeo }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px;box-shadow:0 1px 2px rgba(16,24,40,0.04);margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+              <div style="font-size:14px;font-weight:600">Global Activity</div>
+              <div style="font-size:12px;color:#9ca3af">Last 24 hours</div>
+            </div>
+            <div style="position:relative;height:480px;border-radius:8px;background:
+                linear-gradient(#eef0f3 1px, transparent 1px) 0 0/100% 8%,
+                linear-gradient(90deg,#eef0f3 1px, transparent 1px) 0 0/5% 100%,
+                #fafbfc;border:1px solid #eef0f3;overflow:hidden">
+              <sc-for list="{{ geoMarkers }}" as="m" hint-placeholder-count="6">
+                <div style="{{ m.wrapStyle }}">
+                  <div style="{{ m.ringStyle }}"></div>
+                  <div style="{{ m.dotStyle }}"></div>
+                  <div style="{{ m.labelStyle }}">{{ m.label }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;gap:18px;margin-top:14px">
+              <sc-for list="{{ geoLegend }}" as="lg" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#6b7280">
+                  <div style="{{ lg.dotStyle }}"></div>{{ lg.label }}
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 1px 2px rgba(16,24,40,0.04);overflow:hidden">
+            <div style="font-size:14px;font-weight:600;padding:18px 20px 12px">Actors by Country</div>
+            <sc-for list="{{ countryBreakdown }}" as="cb" hint-placeholder-count="6">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 20px;border-top:1px solid #f3f4f6;font-size:13px">
+                <div style="display:flex;align-items:center;gap:8px"><div style="{{ cb.dotStyle }}"></div>{{ cb.country }}</div>
+                <div style="color:#6b7280">{{ cb.count }} actor{{ cb.plural }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ACTOR DETAIL VIEW -->
+      <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <!-- HEADER -->
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px 26px;margin-bottom:18px;box-shadow:0 1px 2px rgba(16,24,40,0.04)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">
+              <div style="display:flex;gap:16px">
+                <div style="{{ selectedActor.sevAvatarStyle }}">{{ selectedActor.initials }}</div>
+                <div>
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                    <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.3px">{{ selectedActor.name }}</div>
+                    <span style="{{ selectedActor.sevBadgeStyle }}">{{ selectedActor.severity }}</span>
+                  </div>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+                    <sc-for list="{{ selectedActor.aliases }}" as="alias" hint-placeholder-count="3">
+                      <span style="background:#f3f4f6;color:#4b5563;font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:5px;font-family:'IBM Plex Mono',monospace">{{ alias }}</span>
+                    </sc-for>
+                  </div>
+                  <div style="font-size:13px;color:#6b7280;display:flex;gap:16px">
+                    <span><b style="color:#374151">Origin:</b> {{ selectedActor.country }}</span>
+                    <span><b style="color:#374151">Sponsor:</b> {{ selectedActor.sponsor }}</span>
+                    <span><b style="color:#374151">Motivation:</b> {{ selectedActor.motivation }}</span>
+                    <span><b style="color:#374151">Confidence:</b> {{ selectedActor.confidence }}</span>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;flex:none">
+                <div style="border:1px solid #e5e7eb;color:#374151;font-size:12.5px;font-weight:500;padding:8px 14px;border-radius:7px;cursor:pointer">Export Report</div>
+                <div style="background:{{ accentColor }};color:#fff;font-size:12.5px;font-weight:500;padding:8px 14px;border-radius:7px;cursor:pointer">+ Add to Watchlist</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- STAT STRIP -->
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px">
+            <sc-for list="{{ actorStats }}" as="st" hint-placeholder-count="4">
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px 18px">
+                <div style="font-size:12px;color:#6b7280;margin-bottom:6px">{{ st.label }}</div>
+                <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700">{{ st.value }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1.65fr 1fr;gap:16px">
+            <!-- LEFT COL -->
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+                <div style="font-size:14px;font-weight:600;margin-bottom:10px">Overview</div>
+                <div style="font-size:13.5px;line-height:1.65;color:#374151">{{ selectedActor.description }}</div>
+              </div>
+
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+                <div style="font-size:14px;font-weight:600;margin-bottom:12px">ATT&CK Techniques Observed</div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                  <sc-for list="{{ selectedActor.ttps }}" as="ttp" hint-placeholder-count="8">
+                    <span style="{{ ttpBadgeStyle }}">{{ ttp }}</span>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+                <div style="font-size:14px;font-weight:600;padding:18px 20px 12px">Associated Campaigns</div>
+                <sc-for list="{{ selectedActor.relatedCampaigns }}" as="rc" hint-placeholder-count="3">
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-top:1px solid #f3f4f6">
+                    <div>
+                      <div style="font-size:13px;font-weight:500">{{ rc.name }}</div>
+                      <div style="font-size:11.5px;color:#9ca3af;margin-top:2px">{{ rc.sector }} · {{ rc.lastActivity }}</div>
+                    </div>
+                    <span style="{{ rc.statusStyle }}">{{ rc.status }}</span>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+                <div style="font-size:14px;font-weight:600;margin-bottom:16px">Activity Timeline</div>
+                <div style="display:flex;flex-direction:column;gap:0">
+                  <sc-for list="{{ selectedActor.timeline }}" as="ev" hint-placeholder-count="4">
+                    <div style="display:flex;gap:14px">
+                      <div style="display:flex;flex-direction:column;align-items:center;flex:none">
+                        <div style="{{ ev.dotStyle }}"></div>
+                        <div style="{{ ev.lineStyle }}"></div>
+                      </div>
+                      <div style="padding-bottom:20px">
+                        <div style="font-size:11.5px;color:#9ca3af;margin-bottom:2px">{{ ev.date }}</div>
+                        <div style="font-size:13px;font-weight:500;color:#111827">{{ ev.title }}</div>
+                        <div style="font-size:12.5px;color:#6b7280;margin-top:2px">{{ ev.detail }}</div>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+
+            <!-- RIGHT COL -->
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+                <div style="font-size:14px;font-weight:600;margin-bottom:12px">Targeted Sectors</div>
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <sc-for list="{{ selectedActor.sectorBars }}" as="sb" hint-placeholder-count="4">
+                    <div>
+                      <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px"><span>{{ sb.label }}</span><span style="color:#9ca3af">{{ sb.pct }}%</span></div>
+                      <div style="height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden"><div style="{{ sb.barStyle }}"></div></div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+                <div style="font-size:14px;font-weight:600;margin-bottom:12px">Indicators of Compromise</div>
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <sc-for list="{{ selectedActor.iocs }}" as="ioc" hint-placeholder-count="4">
+                    <div style="display:flex;flex-direction:column;gap:3px;padding-bottom:9px;border-bottom:1px solid #f3f4f6">
+                      <span style="font-size:11px;font-weight:600;color:{{ ioc.typeColor }}">{{ ioc.type }}</span>
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#111827;overflow:hidden;text-overflow:ellipsis">{{ ioc.value }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+                <div style="font-size:14px;font-weight:600;margin-bottom:12px">Related Actors</div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <sc-for list="{{ relatedActors }}" as="ra" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:center;gap:9px;cursor:pointer" onClick="{{ ra.onClick }}">
+                      <div style="{{ ra.sevDotStyle }}"></div>
+                      <span style="font-size:13px;font-weight:500">{{ ra.name }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+                <div style="font-size:14px;font-weight:600;margin-bottom:12px">External References</div>
+                <div style="display:flex;flex-direction:column;gap:9px">
+                  <sc-if value="{{ selectedActor.mitreUrl }}" hint-placeholder-val="{{ false }}">
+                    <a href="{{ selectedActor.mitreUrl }}" target="_blank" style="font-size:12.5px;display:flex;align-items:center;gap:7px">
+                      <span style="background:#f3f4f6;color:#4b5563;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:4px">MITRE</span>
+                      {{ selectedActor.mitreId }} — ATT&amp;CK Group Page
+                    </a>
+                  </sc-if>
+                  <a href="{{ selectedActor.malpediaUrl }}" target="_blank" style="font-size:12.5px;display:flex;align-items:center;gap:7px">
+                    <span style="background:#f3f4f6;color:#4b5563;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:4px">Malpedia</span>
+                    Actor Profile
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- IOC SEARCH FULL PAGE -->
+      <sc-if value="{{ isIocs }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="margin-bottom:20px">
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.3px">Indicator Search</div>
+            <div style="font-size:13px;color:#6b7280;margin-top:4px">3,214 indicators tracked across all sources</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 2px rgba(16,24,40,0.04)">
+            <div style="display:flex;align-items:center;gap:8px;background:#f5f6f8;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;margin-bottom:16px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+              <span style="font-size:13px;color:#9ca3af;font-family:'IBM Plex Mono',monospace">Search by IP, domain, hash, or URL…</span>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <sc-for list="{{ iocTypeChips }}" as="chip" hint-placeholder-count="5">
+                <div style="{{ chip.chipStyle }}" onClick="{{ chip.onClick }}">{{ chip.label }}</div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 1px 2px rgba(16,24,40,0.04);overflow:hidden">
+            <div style="display:grid;grid-template-columns:0.7fr 2fr 1fr 1.3fr 1.2fr 1fr 1fr;gap:12px;padding:14px 20px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid #f3f4f6">
+              <div>Type</div><div>Indicator</div><div>Confidence</div><div>Associated Actor</div><div>Source</div><div>First Seen</div><div>Last Seen</div>
+            </div>
+            <sc-if value="{{ isIocLoading }}" hint-placeholder-val="{{ false }}">
+              <sc-for list="{{ skeletonRows }}" as="row" hint-placeholder-count="5">
+                <div style="display:grid;grid-template-columns:0.7fr 2fr 1fr 1.3fr 1.2fr 1fr 1fr;gap:12px;padding:13px 20px;border-top:1px solid #f3f4f6;align-items:center">
+                  <div style="height:12px;border-radius:4px;background:#f0f1f3;width:70%"></div>
+                  <div style="height:12px;border-radius:4px;background:#f0f1f3;width:85%"></div>
+                  <div style="height:12px;border-radius:4px;background:#f0f1f3;width:50%"></div>
+                  <div style="height:12px;border-radius:4px;background:#f0f1f3;width:60%"></div>
+                  <div style="height:12px;border-radius:4px;background:#f0f1f3;width:65%"></div>
+                  <div style="height:12px;border-radius:4px;background:#f0f1f3;width:55%"></div>
+                  <div style="height:12px;border-radius:4px;background:#f0f1f3;width:55%"></div>
+                </div>
+              </sc-for>
+            </sc-if>
+            <sc-if value="{{ isIocEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:56px 20px;text-align:center;color:#9ca3af">
+                <div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:4px">No indicators match this filter</div>
+                <div style="font-size:13px">Try a different indicator type or clear the search.</div>
+              </div>
+            </sc-if>
+            <sc-for list="{{ iocsFull }}" as="ioc" hint-placeholder-count="8">
+              <div style="display:grid;grid-template-columns:0.7fr 2fr 1fr 1.3fr 1.2fr 1fr 1fr;gap:12px;padding:13px 20px;border-top:1px solid #f3f4f6;align-items:center;font-size:13px">
+                <div style="font-size:11px;font-weight:600;color:{{ ioc.typeColor }}">{{ ioc.type }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ioc.value }}</div>
+                <div style="{{ ioc.confStyle }}">{{ ioc.confidence }}</div>
+                <div style="{{ ioc.actorLinkStyle }}">{{ ioc.actor }}</div>
+                <div style="color:#6b7280;font-size:12.5px">{{ ioc.source }}</div>
+                <div style="color:#9ca3af;font-size:12px">{{ ioc.firstSeen }}</div>
+                <div style="color:#9ca3af;font-size:12px">{{ ioc.lastSeen }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ATT&CK MATRIX FULL PAGE -->
+      <sc-if value="{{ isAttack }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;gap:20px">
+            <div>
+              <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.3px">ATT&amp;CK Coverage Matrix</div>
+              <div style="font-size:13px;color:#6b7280;margin-top:4px">{{ matrixStats.covered }} of {{ matrixStats.total }} techniques observed ({{ matrixStats.pct }}% coverage)</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;font-size:11.5px;color:#9ca3af">
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#e5e7eb;display:inline-block"></span>None</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#c7d2fe;display:inline-block"></span>Low</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#818cf8;display:inline-block"></span>Med</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#4338ca;display:inline-block"></span>High</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">
+            <sc-for list="{{ attackChips }}" as="chip" hint-placeholder-count="7">
+              <div style="{{ chip.chipStyle }}" onClick="{{ chip.onClick }}">{{ chip.name }}</div>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px">
+            <sc-for list="{{ matrixFull }}" as="tac" hint-placeholder-count="12">
+              <div style="flex:none;width:160px;display:flex;flex-direction:column;gap:6px">
+                <div style="font-size:12px;font-weight:600;color:#374151;padding:8px 4px;text-align:center;background:#fff;border:1px solid #e5e7eb;border-radius:6px">{{ tac.name }}</div>
+                <sc-for list="{{ tac.techniques }}" as="tech" hint-placeholder-count="4">
+                  <div style="{{ tech.cellStyle }}">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;opacity:0.85">{{ tech.id }}</div>
+                    <div style="font-size:11.5px;font-weight:500;line-height:1.25">{{ tech.name }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- CAMPAIGN DETAIL VIEW -->
+      <sc-if value="{{ isCampaign }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px 26px;margin-bottom:18px;box-shadow:0 1px 2px rgba(16,24,40,0.04)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">
+              <div>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                  <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.3px">{{ selectedCampaign.name }}</div>
+                  <span style="{{ selectedCampaign.statusBadgeStyle }}">{{ selectedCampaign.status }}</span>
+                </div>
+                <div style="font-size:13px;color:#6b7280;display:flex;gap:16px;align-items:center">
+                  <span style="display:flex;align-items:center;gap:6px;cursor:pointer" onClick="{{ selectedCampaign.goToActorClick }}">
+                    <span style="{{ selectedCampaign.actorSevDotStyle }}"></span>
+                    <b style="color:#374151">Attributed to:</b> {{ selectedCampaign.actorName }}
+                  </span>
+                  <span><b style="color:#374151">Sector:</b> {{ selectedCampaign.sector }}</span>
+                  <span><b style="color:#374151">First Seen:</b> {{ selectedCampaign.firstSeen }}</span>
+                  <span><b style="color:#374151">Confidence:</b> {{ selectedCampaign.confidence }}</span>
+                </div>
+              </div>
+              <div style="border:1px solid #e5e7eb;color:#374151;font-size:12.5px;font-weight:500;padding:8px 14px;border-radius:7px;cursor:pointer;flex:none">Export Report</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1.65fr 1fr;gap:16px">
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+                <div style="font-size:14px;font-weight:600;margin-bottom:10px">Overview</div>
+                <div style="font-size:13.5px;line-height:1.65;color:#374151">{{ selectedCampaign.overview }}</div>
+              </div>
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+                <div style="font-size:14px;font-weight:600;margin-bottom:12px">ATT&amp;CK Techniques Observed</div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                  <sc-for list="{{ selectedCampaign.ttps }}" as="ttp" hint-placeholder-count="6">
+                    <span style="{{ ttp.style }}">{{ ttp.id }}</span>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+                <div style="font-size:14px;font-weight:600;margin-bottom:16px">Recent Activity</div>
+                <div style="display:flex;flex-direction:column;gap:0">
+                  <sc-for list="{{ selectedCampaign.timeline }}" as="ev" hint-placeholder-count="3">
+                    <div style="display:flex;gap:14px">
+                      <div style="display:flex;flex-direction:column;align-items:center;flex:none">
+                        <div style="{{ ev.dotStyle }}"></div>
+                        <div style="{{ ev.lineStyle }}"></div>
+                      </div>
+                      <div style="padding-bottom:20px">
+                        <div style="font-size:11.5px;color:#9ca3af;margin-bottom:2px">{{ ev.date }}</div>
+                        <div style="font-size:13px;font-weight:500;color:#111827">{{ ev.title }}</div>
+                        <div style="font-size:12.5px;color:#6b7280;margin-top:2px">{{ ev.detail }}</div>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px 18px">
+                <div style="font-size:12px;color:#6b7280;margin-bottom:6px">Linked IOCs</div>
+                <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700">{{ selectedCampaign.iocCount }}</div>
+              </div>
+              <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+                <div style="font-size:14px;font-weight:600;margin-bottom:12px">Indicators of Compromise</div>
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <sc-for list="{{ selectedCampaign.linkedIocs }}" as="ioc" hint-placeholder-count="4">
+                    <div style="display:flex;flex-direction:column;gap:3px;padding-bottom:9px;border-bottom:1px solid #f3f4f6">
+                      <span style="font-size:11px;font-weight:600;color:{{ ioc.typeColor }}">{{ ioc.type }}</span>
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#111827;overflow:hidden;text-overflow:ellipsis">{{ ioc.value }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- REPORTS VIEW -->
+      <sc-if value="{{ isReports }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="margin-bottom:20px">
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.3px">Reports</div>
+            <div style="font-size:13px;color:#6b7280;margin-top:4px">Generated actor profiles, campaign briefs, and coverage summaries</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 1px 2px rgba(16,24,40,0.04);overflow:hidden">
+            <div style="display:grid;grid-template-columns:2.2fr 1.2fr 1.4fr 1fr 0.8fr;padding:14px 20px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid #f3f4f6">
+              <div>Report</div><div>Type</div><div>Related To</div><div>Generated</div><div>Format</div>
+            </div>
+            <sc-for list="{{ reportsRows }}" as="r" hint-placeholder-count="6">
+              <div style="display:grid;grid-template-columns:2.2fr 1.2fr 1.4fr 1fr 0.8fr;padding:13px 20px;border-top:1px solid #f3f4f6;align-items:center;font-size:13px">
+                <div style="font-weight:500">{{ r.title }}</div>
+                <div style="color:#6b7280">{{ r.type }}</div>
+                <div style="color:#6b7280">{{ r.related }}</div>
+                <div style="color:#9ca3af;font-size:12px">{{ r.date }}</div>
+                <div><span style="{{ r.formatStyle }}">{{ r.format }}</span></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;accentColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#4338ca&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#4338ca&quot;,&quot;#0f766e&quot;,&quot;#7c3aed&quot;,&quot;#1d4ed8&quot;],&quot;section&quot;:&quot;Theme&quot;},&quot;iocViewState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;default&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;default&quot;,&quot;loading&quot;,&quot;empty&quot;],&quot;section&quot;:&quot;Demo states&quot;}}">
+const SEV = {
+  critical: {bg:'#fef2f2', text:'#b91c1c', dot:'#dc2626', ring:'#dc2626'},
+  high:     {bg:'#fff7ed', text:'#c2410c', dot:'#ea580c', ring:'#ea580c'},
+  medium:   {bg:'#fffbeb', text:'#b45309', dot:'#d97706', ring:'#d97706'},
+  low:      {bg:'#f0fdf4', text:'#15803d', dot:'#16a34a', ring:'#16a34a'}
+};
+const IOC_COLOR = {IP:'#0d9488', DOMAIN:'#4338ca', HASH:'#b45309', URL:'#0d9488'};
+function tint(hex){ const h=hex.replace('#',''); const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16); const mix=(c)=>Math.round(c+(255-c)*0.88); return `rgb(${mix(r)},${mix(g)},${mix(b)})`; }
+
+function badgeStyle(sev){
+  const c = SEV[sev] || SEV.medium;
+  return `background:${c.bg};color:${c.text};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;padding:4px 10px;border-radius:5px`;
+}
+function dotStyle(sev, size){
+  const c = SEV[sev] || SEV.medium;
+  return `width:${size||8}px;height:${size||8}px;border-radius:50%;background:${c.dot};flex:none`;
+}
+
+class Component extends DCLogic {
+  state = { view: 'dashboard', selectedActorId: 'a1', selectedCampaignId: 'c1', attackFilterActorId: 'all', iocTypeFilter: 'All' };
+
+  actors = [
+    {id:'a1', name:'APT28', mitreId:'G0007', malpediaSlug:'apt28', aliases:['Fancy Bear','Sofacy','Sednit','Forest Blizzard'], country:'Russia', sponsor:'GRU Unit 26165', motivation:'Espionage', severity:'critical', campaigns:5, iocs:38, techniques:22, confidence:'High',
+     description:'APT28 is a Russian military intelligence (GRU) cyber espionage actor active since at least 2004, publicly tracked under aliases including Fancy Bear and Sofacy. The group targets government, military, and defense-sector networks across Europe and North America, using credential-harvesting phishing, zero-day exploitation, and custom malware frameworks such as X-Agent.',
+     ttps:['T1566.001','T1059.001','T1055','T1071.001','T1027','T1105','T1547.001','T1082'],
+     sectorBars:[{label:'Government', pct:52},{label:'Defense', pct:26},{label:'Media & NGOs', pct:14},{label:'Energy', pct:8}],
+     relatedCampaigns:[{name:'Operation Frostline', sector:'Government', lastActivity:'3 days ago', status:'active'},{name:'Operation Cinderbolt', sector:'Defense', lastActivity:'2 weeks ago', status:'active'},{name:'Operation Greyveil', sector:'Media & NGOs', lastActivity:'41 days ago', status:'dormant'}],
+     timeline:[{date:'Jul 29, 2026', title:'New C2 infrastructure identified', detail:'3 domains registered via same fast-flux DNS provider used in 2024 campaign.'},{date:'Jul 12, 2026', title:'Spear-phish wave detected', detail:'Targeted 14 government-sector entities in Poland and Romania.'},{date:'Jun 18, 2026', title:'New loader variant observed', detail:'Updated packer, same C2 protocol fingerprint as prior samples.'},{date:'Mar 02, 2026', title:'First observed activity (this cluster)', detail:'Attributed via infrastructure overlap with historical intrusion set.'}],
+     iocs:[{type:'IP', value:'185.220.101.42', typeColor:IOC_COLOR.IP},{type:'DOMAIN', value:'update-cdn-svc.net', typeColor:IOC_COLOR.DOMAIN},{type:'HASH', value:'e3b0c44298fc1c149afbf4c8', typeColor:IOC_COLOR.HASH},{type:'IP', value:'91.219.237.18', typeColor:IOC_COLOR.IP}]},
+    {id:'a2', name:'APT33', mitreId:'G0064', malpediaSlug:'apt33', aliases:['Elfin','Refined Kitten','Magnallium'], country:'Iran', sponsor:'IRGC-linked', motivation:'Espionage', severity:'high', campaigns:3, iocs:21, techniques:16, confidence:'Medium',
+     description:'APT33 is an Iranian threat actor active since at least 2013, publicly tracked as Elfin and Refined Kitten. The group has targeted aviation, energy, and petrochemical organizations across the US, Saudi Arabia, and South Korea using spear-phishing, password-spraying, and destructive malware associated with follow-on sabotage.',
+     ttps:['T1566.001','T1110','T1078','T1136','T1021.002'],
+     sectorBars:[{label:'Energy', pct:45},{label:'Aviation', pct:33},{label:'Petrochemical', pct:22}],
+     relatedCampaigns:[{name:'Operation Ashwind', sector:'Energy', lastActivity:'6 days ago', status:'active'},{name:'Operation Palefire', sector:'Aviation', lastActivity:'1 month ago', status:'dormant'}],
+     timeline:[{date:'Jul 25, 2026', title:'Password-spray wave detected', detail:'Matches known APT33 targeting pattern against aviation-sector VPN portals.'},{date:'May 30, 2026', title:'Destructive payload observed', detail:'Deployed post-exfiltration against regional energy subsidiary.'}],
+     iocs:[{type:'DOMAIN', value:'secure-billing-portal.com', typeColor:IOC_COLOR.DOMAIN},{type:'HASH', value:'a94a8fe5ccb19ba61c4c087a', typeColor:IOC_COLOR.HASH}]},
+    {id:'a3', name:'APT41', mitreId:'G0096', malpediaSlug:'apt41', aliases:['Double Dragon','BARIUM','Wicked Panda','Brass Typhoon'], country:'China', sponsor:'MSS-linked (dual espionage/financial)', motivation:'IP Theft', severity:'critical', campaigns:7, iocs:54, techniques:29, confidence:'High',
+     description:'APT41 is a China-based actor conducting both state-sponsored espionage and financially motivated operations, tracked under aliases including Double Dragon and Wicked Panda. The group compromises software supply chains and telecom providers, and is known for rapid weaponization of newly disclosed vulnerabilities.',
+     ttps:['T1195.002','T1505.003','T1071.001','T1046','T1078.004','T1560'],
+     sectorBars:[{label:'Telecom', pct:38},{label:'Manufacturing', pct:34},{label:'Healthcare', pct:28}],
+     relatedCampaigns:[{name:'Operation Longspindle', sector:'Telecom', lastActivity:'yesterday', status:'active'},{name:'Operation Ironloom', sector:'Manufacturing', lastActivity:'9 days ago', status:'active'}],
+     timeline:[{date:'Jul 30, 2026', title:'Edge device web shells found', detail:'Consistent with prior APT41 persistence tradecraft.'},{date:'Jun 02, 2026', title:'Supply-chain compromise confirmed', detail:'Trojanized update package traced to build server intrusion.'}],
+     iocs:[{type:'IP', value:'103.224.182.9', typeColor:IOC_COLOR.IP},{type:'DOMAIN', value:'cdn-assets-sync.org', typeColor:IOC_COLOR.DOMAIN}]},
+    {id:'a4', name:'LAZARUS GROUP', mitreId:'G0032', malpediaSlug:'lazarus_group', aliases:['Hidden Cobra','Guardians of Peace','ZINC','Diamond Sleet'], country:'North Korea', sponsor:'Reconnaissance General Bureau', motivation:'Financial Gain', severity:'high', campaigns:4, iocs:29, techniques:18, confidence:'High',
+     description:'Lazarus Group is a North Korean state-sponsored actor operating under the Reconnaissance General Bureau, publicly tracked as Hidden Cobra and Diamond Sleet. The group funds state revenue through cryptocurrency theft and fraudulent remote-IT-worker schemes, targeting exchanges and fintech firms with social-engineering-led intrusions.',
+     ttps:['T1566.002','T1204.002','T1552.001','T1027.002'],
+     sectorBars:[{label:'Financial Services', pct:71},{label:'Technology', pct:29}],
+     relatedCampaigns:[{name:'Operation Ledgerfall', sector:'Financial Services', lastActivity:'4 days ago', status:'active'}],
+     timeline:[{date:'Jul 27, 2026', title:'Fake recruiter campaign detected', detail:'LinkedIn-based approach delivering trojanized coding test.'}],
+     iocs:[{type:'URL', value:'hxxps://npm-package-cdn.io/verify', typeColor:IOC_COLOR.URL}]},
+    {id:'a5', name:'APT-C-23', malpediaSlug:'apt_c_23', aliases:['Arid Viper','Desert Falcon','Two-tailed Scorpion'], country:'Unknown', sponsor:'Unattributed', motivation:'Espionage', severity:'medium', campaigns:2, iocs:14, techniques:11, confidence:'Low',
+     description:'APT-C-23 is a lower-confidence cluster publicly tracked as Arid Viper and Desert Falcon, linked to mobile and desktop espionage malware against Middle Eastern telecom and government targets since 2014. Attribution to a specific state sponsor remains unconfirmed, relying on shared infrastructure and code overlap rather than direct victim reporting.',
+     ttps:['T1595','T1590','T1589'],
+     sectorBars:[{label:'Telecom', pct:70},{label:'Government', pct:30}],
+     relatedCampaigns:[{name:'Operation Faintmark', sector:'Telecom', lastActivity:'23 days ago', status:'dormant'}],
+     timeline:[{date:'Jul 08, 2026', title:'Passive DNS overlap identified', detail:'Shared registrar pattern with two prior scanning waves.'}],
+     iocs:[{type:'IP', value:'45.155.204.71', typeColor:IOC_COLOR.IP}]},
+    {id:'a6', name:'SANDWORM TEAM', mitreId:'G0034', malpediaSlug:'sandworm_team', aliases:['ELECTRUM','Telebots','Voodoo Bear','Seashell Blizzard'], country:'Russia', sponsor:'GRU Unit 74455', motivation:'Sabotage', severity:'low', campaigns:1, iocs:8, techniques:7, confidence:'Medium',
+     description:'Sandworm Team is a Russian GRU (Unit 74455) actor with a history of destructive attacks against Ukrainian power grid and industrial control systems, publicly tracked as ELECTRUM and Voodoo Bear. Activity currently tracked under this cluster is limited to low-volume reconnaissance scanning of exposed utility control interfaces, with no confirmed OT impact to date.',
+     ttps:['T0846','T0801'],
+     sectorBars:[{label:'Utilities', pct:100}],
+     relatedCampaigns:[{name:'Operation Stillwater', sector:'Utilities', lastActivity:'2 months ago', status:'dormant'}],
+     timeline:[{date:'May 14, 2026', title:'ICS network scanning observed', detail:'Low-volume probing of exposed HMI interfaces.'}],
+     iocs:[{type:'IP', value:'194.32.78.5', typeColor:IOC_COLOR.IP}]},
+    {id:'a7', name:'APT29', mitreId:'G0016', malpediaSlug:'apt29', aliases:['Cozy Bear','The Dukes','Midnight Blizzard'], country:'Russia', sponsor:'SVR', motivation:'Espionage', severity:'critical', campaigns:2, techniques:19, confidence:'High',
+     description:'APT29 is a Russian Foreign Intelligence Service (SVR) actor active since at least 2008, publicly tracked as Cozy Bear and Midnight Blizzard. The group is known for stealthy, long-dwell cloud and supply-chain intrusions against government, think-tank, and technology targets, including the 2020 SolarWinds compromise.',
+     ttps:['T1078.004','T1195.002','T1071.001','T1548','T1550.001'],
+     sectorBars:[{label:'Government', pct:58},{label:'Technology', pct:31},{label:'Think Tanks', pct:11}],
+     relatedCampaigns:[{name:'Operation Cloudveil', sector:'Technology', lastActivity:'5 days ago', status:'active'},{name:'Operation Duskwire', sector:'Government', lastActivity:'19 days ago', status:'active'}],
+     timeline:[{date:'Jul 21, 2026', title:'Cloud tenant compromise identified', detail:'OAuth token theft used to bypass MFA on victim tenant.'},{date:'Jun 04, 2026', title:'Supply-chain reconnaissance observed', detail:'Targeting build pipelines of a government software vendor.'}],
+     iocs:[{type:'DOMAIN', value:'graph-api-auth.net', typeColor:IOC_COLOR.DOMAIN},{type:'IP', value:'146.70.124.33', typeColor:IOC_COLOR.IP}]},
+    {id:'a8', name:'OILRIG', mitreId:'G0049', malpediaSlug:'oilrig', aliases:['APT34','Helix Kitten','Crambus'], country:'Iran', sponsor:'MOIS', motivation:'Espionage', severity:'high', campaigns:1, techniques:14, confidence:'High',
+     description:'OilRig is an Iranian Ministry of Intelligence (MOIS) actor active since at least 2014, publicly tracked as APT34 and Helix Kitten. The group targets government, financial, and energy organizations across the Middle East using DNS tunneling malware and trusted-vendor spear-phishing.',
+     ttps:['T1071.004','T1566.001','T1053.005','T1105'],
+     sectorBars:[{label:'Government', pct:44},{label:'Financial Services', pct:33},{label:'Energy', pct:23}],
+     relatedCampaigns:[{name:'Operation Sandtunnel', sector:'Government', lastActivity:'11 days ago', status:'active'}],
+     timeline:[{date:'Jul 15, 2026', title:'DNS tunneling C2 identified', detail:'New subdomain pattern matching prior OilRig tooling.'}],
+     iocs:[{type:'DOMAIN', value:'ns1-relay-svc.info', typeColor:IOC_COLOR.DOMAIN}]},
+    {id:'a9', name:'KIMSUKY', mitreId:'G0094', malpediaSlug:'kimsuky', aliases:['Black Banshee','Thallium','Emerald Sleet'], country:'North Korea', sponsor:'Reconnaissance General Bureau', motivation:'Espionage', severity:'medium', campaigns:1, techniques:12, confidence:'Medium',
+     description:'Kimsuky is a North Korean RGB-linked actor active since at least 2012, publicly tracked as Emerald Sleet and Thallium. The group runs credential-phishing and social-engineering operations against journalists, academics, and government researchers focused on Korean Peninsula policy.',
+     ttps:['T1566.002','T1598.003','T1114.002'],
+     sectorBars:[{label:'Government', pct:50},{label:'Academia', pct:35},{label:'Media & NGOs', pct:15}],
+     relatedCampaigns:[{name:'Operation Inkwell', sector:'Academia', lastActivity:'17 days ago', status:'active'}],
+     timeline:[{date:'Jul 09, 2026', title:'Spear-phish targeting researchers', detail:'Fake conference invitations delivering credential-harvesting links.'}],
+     iocs:[{type:'URL', value:'hxxps://secure-conf-invite.org/rsvp', typeColor:IOC_COLOR.URL}]},
+    {id:'a10', name:'TURLA', mitreId:'G0010', malpediaSlug:'turla', aliases:['Snake','Venomous Bear','Secret Blizzard'], country:'Russia', sponsor:'FSB Center 16', motivation:'Espionage', severity:'high', campaigns:1, techniques:15, confidence:'High',
+     description:'Turla is a Russian FSB-linked actor active since at least 1996, publicly tracked as Snake and Secret Blizzard, among the longest-running espionage clusters tracked in open source. The group is known for satellite-based C2 hijacking and compromising other threat actors\' infrastructure to piggyback on their access.',
+     ttps:['T1071.001','T1205','T1554','T1082'],
+     sectorBars:[{label:'Government', pct:47},{label:'Defense', pct:38},{label:'Media & NGOs', pct:15}],
+     relatedCampaigns:[{name:'Operation Serpentrelay', sector:'Defense', lastActivity:'28 days ago', status:'dormant'}],
+     timeline:[{date:'Jun 30, 2026', title:'Satellite C2 link identified', detail:'Hijacked downlink used for covert command traffic, consistent with prior Turla tradecraft.'}],
+     iocs:[{type:'IP', value:'77.238.240.19', typeColor:IOC_COLOR.IP}]},
+    {id:'a11', name:'MUSTANG PANDA', mitreId:'G0129', malpediaSlug:'mustang_panda', aliases:['Bronze President','Stately Taurus','Red Lich'], country:'China', sponsor:'Unattributed (assessed state-tasked)', motivation:'Espionage', severity:'medium', campaigns:1, techniques:13, confidence:'Medium',
+     description:'Mustang Panda is a China-based actor active since at least 2012, publicly tracked as Bronze President and Stately Taurus. The group targets government and NGO entities across Southeast Asia and Europe using USB-borne malware and sideloaded DLLs delivered through phishing lures referencing regional political events.',
+     ttps:['T1091','T1574.002','T1566.001'],
+     sectorBars:[{label:'Government', pct:41},{label:'Media & NGOs', pct:39},{label:'Telecom', pct:20}],
+     relatedCampaigns:[{name:'Operation Bambooline', sector:'Media & NGOs', lastActivity:'34 days ago', status:'dormant'}],
+     timeline:[{date:'Jun 21, 2026', title:'USB worm variant identified', detail:'New DLL sideloading chain observed dropping via removable media.'}],
+     iocs:[{type:'HASH', value:'d41d8cd98f00b204e9800998', typeColor:IOC_COLOR.HASH}]},
+    {id:'a12', name:'SCATTERED SPIDER', mitreId:'G1015', malpediaSlug:'scattered_spider', aliases:['Muddled Libra','Octo Tempest','UNC3944'], country:'Unknown', sponsor:'Financially motivated (eCrime)', motivation:'Financial Gain', severity:'high', campaigns:1, techniques:16, confidence:'High',
+     description:'Scattered Spider is a financially motivated collective active since at least 2022, publicly tracked as Octo Tempest and UNC3944. The group specializes in help-desk social engineering and SIM-swapping to bypass MFA, gaining access to identity providers before deploying ransomware or extorting victims directly.',
+     ttps:['T1656','T1621','T1098','T1486'],
+     sectorBars:[{label:'Technology', pct:36},{label:'Retail', pct:34},{label:'Financial Services', pct:30}],
+     relatedCampaigns:[{name:'Operation Sockpuppet', sector:'Technology', lastActivity:'2 days ago', status:'active'}],
+     timeline:[{date:'Aug 01, 2026', title:'Help-desk vishing wave detected', detail:'Callers impersonating IT staff to reset MFA on privileged accounts.'}],
+     iocs:[{type:'DOMAIN', value:'okta-verify-support.com', typeColor:IOC_COLOR.DOMAIN}]}
+  ];
+
+  campaignsAll = [
+    {id:'c1', name:'Operation Frostline', actorId:'a1', sector:'Government', status:'active', firstSeen:'Mar 02, 2026', lastActivity:'3 days ago'},
+    {id:'c2', name:'Operation Cinderbolt', actorId:'a1', sector:'Defense', status:'active', firstSeen:'Jan 14, 2026', lastActivity:'2 weeks ago'},
+    {id:'c3', name:'Operation Greyveil', actorId:'a1', sector:'Media & NGOs', status:'dormant', firstSeen:'Nov 09, 2025', lastActivity:'41 days ago'},
+    {id:'c4', name:'Operation Ashwind', actorId:'a2', sector:'Energy', status:'active', firstSeen:'Feb 20, 2026', lastActivity:'6 days ago'},
+    {id:'c5', name:'Operation Palefire', actorId:'a2', sector:'Aviation', status:'dormant', firstSeen:'Dec 01, 2025', lastActivity:'1 month ago'},
+    {id:'c6', name:'Operation Longspindle', actorId:'a3', sector:'Telecom', status:'active', firstSeen:'Apr 18, 2026', lastActivity:'yesterday'},
+    {id:'c7', name:'Operation Ironloom', actorId:'a3', sector:'Manufacturing', status:'active', firstSeen:'Mar 22, 2026', lastActivity:'9 days ago'},
+    {id:'c8', name:'Operation Ledgerfall', actorId:'a4', sector:'Financial Services', status:'active', firstSeen:'May 05, 2026', lastActivity:'4 days ago'},
+    {id:'c9', name:'Operation Faintmark', actorId:'a5', sector:'Telecom', status:'dormant', firstSeen:'Jun 10, 2026', lastActivity:'23 days ago'},
+    {id:'c10', name:'Operation Stillwater', actorId:'a6', sector:'Utilities', status:'dormant', firstSeen:'Apr 02, 2026', lastActivity:'2 months ago'},
+    {id:'c11', name:'Operation Cloudveil', actorId:'a7', sector:'Technology', status:'active', firstSeen:'May 02, 2026', lastActivity:'5 days ago'},
+    {id:'c12', name:'Operation Duskwire', actorId:'a7', sector:'Government', status:'active', firstSeen:'Apr 18, 2026', lastActivity:'19 days ago'},
+    {id:'c13', name:'Operation Sandtunnel', actorId:'a8', sector:'Government', status:'active', firstSeen:'Jun 20, 2026', lastActivity:'11 days ago'},
+    {id:'c14', name:'Operation Inkwell', actorId:'a9', sector:'Academia', status:'active', firstSeen:'Jun 12, 2026', lastActivity:'17 days ago'},
+    {id:'c15', name:'Operation Serpentrelay', actorId:'a10', sector:'Defense', status:'dormant', firstSeen:'Mar 15, 2026', lastActivity:'28 days ago'},
+    {id:'c16', name:'Operation Bambooline', actorId:'a11', sector:'Media & NGOs', status:'dormant', firstSeen:'Feb 28, 2026', lastActivity:'34 days ago'},
+    {id:'c17', name:'Operation Sockpuppet', actorId:'a12', sector:'Technology', status:'active', firstSeen:'Jul 25, 2026', lastActivity:'2 days ago'}
+  ];
+  dashboardCampaignIds = ['c1','c6','c4','c8','c3'];
+
+  reportsList = [
+    {title:'APT28 — Actor Profile', type:'Actor Profile', related:'APT28', date:'Jul 30, 2026', format:'PDF'},
+    {title:'Operation Frostline — Campaign Brief', type:'Campaign Brief', related:'Operation Frostline', date:'Jul 29, 2026', format:'PDF'},
+    {title:'Energy Sector Exposure Assessment', type:'Sector Assessment', related:'Energy', date:'Jul 24, 2026', format:'DOCX'},
+    {title:'APT41 — Actor Profile', type:'Actor Profile', related:'APT41', date:'Jul 18, 2026', format:'PDF'},
+    {title:'Q3 ATT&CK Coverage Summary', type:'Coverage Report', related:'All Actors', date:'Jul 10, 2026', format:'PDF'},
+    {title:'Operation Ledgerfall — Campaign Brief', type:'Campaign Brief', related:'Operation Ledgerfall', date:'Jun 29, 2026', format:'DOCX'},
+    {title:'APT29 — Actor Profile', type:'Actor Profile', related:'APT29', date:'Jun 22, 2026', format:'PDF'},
+    {title:'Scattered Spider — IOC Feed Export', type:'IOC Feed', related:'SCATTERED SPIDER', date:'Jun 15, 2026', format:'CSV'}
+  ];
+
+  iocsGlobal = [
+    {type:'IP', value:'185.220.101.42', actor:'APT28', confidence:'High', source:'Internal Telemetry', firstSeen:'Jul 12, 2026', lastSeen:'Jul 30, 2026'},
+    {type:'DOMAIN', value:'cdn-assets-sync.org', actor:'APT41', confidence:'High', source:'OSINT Feed', firstSeen:'Jun 02, 2026', lastSeen:'Jul 29, 2026'},
+    {type:'HASH', value:'e3b0c44298fc1c149afb1234abcd', actor:'APT28', confidence:'Medium', source:'Sandbox Detonation', firstSeen:'Jun 18, 2026', lastSeen:'Jul 12, 2026'},
+    {type:'URL', value:'hxxps://npm-package-cdn.io/verify', actor:'LAZARUS GROUP', confidence:'High', source:'Partner Share', firstSeen:'Jul 20, 2026', lastSeen:'Jul 27, 2026'},
+    {type:'IP', value:'45.155.204.71', actor:'APT-C-23', confidence:'Low', source:'OSINT Feed', firstSeen:'Jul 08, 2026', lastSeen:'Jul 08, 2026'},
+    {type:'DOMAIN', value:'update-cdn-svc.net', actor:'APT28', confidence:'High', source:'Internal Telemetry', firstSeen:'Mar 04, 2026', lastSeen:'Jul 29, 2026'},
+    {type:'IP', value:'91.219.237.18', actor:'APT28', confidence:'Medium', source:'Partner Share', firstSeen:'May 11, 2026', lastSeen:'Jul 20, 2026'},
+    {type:'HASH', value:'a94a8fe5ccb19ba61c4c087a99a1', actor:'APT33', confidence:'High', source:'Sandbox Detonation', firstSeen:'May 28, 2026', lastSeen:'Jul 25, 2026'},
+    {type:'DOMAIN', value:'secure-billing-portal.com', actor:'APT33', confidence:'Medium', source:'OSINT Feed', firstSeen:'May 30, 2026', lastSeen:'Jul 06, 2026'},
+    {type:'IP', value:'103.224.182.9', actor:'APT41', confidence:'High', source:'Internal Telemetry', firstSeen:'Jun 30, 2026', lastSeen:'Jul 30, 2026'},
+    {type:'IP', value:'194.32.78.5', actor:'SANDWORM TEAM', confidence:'Low', source:'OSINT Feed', firstSeen:'May 14, 2026', lastSeen:'May 14, 2026'},
+    {type:'URL', value:'hxxps://secure-auth-verify.net/login', actor:'LAZARUS GROUP', confidence:'Medium', source:'Partner Share', firstSeen:'Jul 22, 2026', lastSeen:'Jul 27, 2026'}
+  ];
+
+  tacticsFull = [
+    {name:'Reconnaissance', techniques:[{id:'T1595', name:'Active Scanning'},{id:'T1589', name:'Gather Victim Identity Info'},{id:'T1590', name:'Gather Victim Network Info'}]},
+    {name:'Resource Development', techniques:[{id:'T1583', name:'Acquire Infrastructure'},{id:'T1585', name:'Establish Accounts'}]},
+    {name:'Initial Access', techniques:[{id:'T1566.001', name:'Phishing: Attachment'},{id:'T1566.002', name:'Phishing: Link'},{id:'T1195.002', name:'Supply Chain Compromise'},{id:'T1078', name:'Valid Accounts'},{id:'T1078.004', name:'Valid Accounts: Cloud'}]},
+    {name:'Execution', techniques:[{id:'T1059.001', name:'PowerShell'},{id:'T1204.002', name:'User Execution: File'},{id:'T1053', name:'Scheduled Task/Job'}]},
+    {name:'Persistence', techniques:[{id:'T1547.001', name:'Boot/Logon Autostart'},{id:'T1136', name:'Create Account'},{id:'T1505.003', name:'Server Software: Web Shell'}]},
+    {name:'Priv. Escalation', techniques:[{id:'T1055', name:'Process Injection'},{id:'T1068', name:'Exploit for Priv. Esc.'}]},
+    {name:'Stealth', techniques:[{id:'T1027', name:'Obfuscated Files'},{id:'T1027.002', name:'Software Packing'},{id:'T1070', name:'Indicator Removal'}]},
+    {name:'Defense Impairment', techniques:[{id:'T1562.001', name:'Disable or Modify Tools'},{id:'T1562.004', name:'Disable or Modify Firewall'}]},
+    {name:'Credential Access', techniques:[{id:'T1552.001', name:'Unsecured Credentials: Files'},{id:'T1110', name:'Brute Force'},{id:'T1003', name:'OS Credential Dumping'}]},
+    {name:'Discovery', techniques:[{id:'T1082', name:'System Info Discovery'},{id:'T1046', name:'Network Service Scanning'},{id:'T1087', name:'Account Discovery'}]},
+    {name:'Lateral Movement', techniques:[{id:'T1021.002', name:'Remote Services: SMB'},{id:'T1550.001', name:'Use Alternate Auth Material'}]},
+    {name:'Collection', techniques:[{id:'T1560', name:'Archive Collected Data'},{id:'T1114.002', name:'Email Collection: Remote'},{id:'T1005', name:'Data from Local System'}]},
+    {name:'Command and Control', techniques:[{id:'T1071.001', name:'App Layer Protocol: Web'},{id:'T1105', name:'Ingress Tool Transfer'},{id:'T1071.004', name:'App Layer Protocol: DNS'}]},
+    {name:'Exfiltration', techniques:[{id:'T1041', name:'Exfil Over C2 Channel'}]},
+    {name:'Impact', techniques:[{id:'T1486', name:'Data Encrypted for Impact'},{id:'T1490', name:'Inhibit System Recovery'}]}
+  ];
+
+  geoMarkersRaw = [
+    {label:'RU', top:'22%', left:'56%', sev:'critical'},
+    {label:'CN', top:'34%', left:'80%', sev:'critical'},
+    {label:'IR', top:'44%', left:'62%', sev:'high'},
+    {label:'KP', top:'32%', left:'86%', sev:'high'},
+    {label:'US', top:'40%', left:'16%', sev:'medium'},
+    {label:'BR', top:'68%', left:'26%', sev:'low'}
+  ];
+
+  goToActor(id){ this.setState({view:'detail', selectedActorId:id}); }
+  goToCampaign(id){ this.setState({view:'campaign', selectedCampaignId:id}); }
+  goBack(){ this.setState({view:'dashboard'}); }
+  goToView(v){ this.setState({view:v}); }
+  setAttackFilter(id){ this.setState({attackFilterActorId:id}); }
+  setIocFilter(type){ this.setState({iocTypeFilter:type}); }
+  setActorSearch(e){ this.setState({actorSearch:e.target.value}); }
+  setActorSeverityFilter(id){ this.setState({actorSeverityFilter:id}); }
+
+  cellColor(level){
+    return ['#e5e7eb','#c7d2fe','#818cf8','#4338ca'][level] || '#e5e7eb';
+  }
+
+  coverageActors(){ return this.actors.filter(a => a.id !== 'a6'); }
+
+  techLevel(id, filterId){
+    if(filterId === 'all'){
+      const count = this.coverageActors().filter(a => a.ttps.includes(id)).length;
+      return count === 0 ? 0 : count === 1 ? 1 : count === 2 ? 2 : 3;
+    }
+    const a = this.actors.find(a => a.id === filterId);
+    return (a && a.ttps.includes(id)) ? 3 : 0;
+  }
+
+  renderVals(){
+    const self = this;
+    const accent = this.props.accentColor || '#4338ca';
+    const accentTint = tint(accent);
+    const ttpBadgeStyle = `background:${accentTint};color:${accent};font-size:12px;font-weight:500;padding:6px 11px;border-radius:6px;font-family:'IBM Plex Mono',monospace`;
+    const enrichActor = (a) => ({
+      ...a,
+      sevDotStyle: dotStyle(a.severity, 9),
+      sevAvatarStyle: `width:52px;height:52px;border-radius:12px;background:${SEV[a.severity].bg};color:${SEV[a.severity].text};font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:center;flex:none`,
+      sevBadgeStyle: badgeStyle(a.severity),
+      initials: a.name.split(' ').map(w=>w[0]).join(''),
+      onClick: () => self.goToActor(a.id),
+      iocs: (a.iocs || []).map(i => ({...i})),
+      mitreUrl: a.mitreId ? `https://attack.mitre.org/groups/${a.mitreId}/` : null,
+      malpediaUrl: `https://malpedia.caad.fkie.fraunhofer.de/actor/${a.malpediaSlug}`
+    });
+
+    const actorsView = this.actors.map(enrichActor);
+
+    const search = (this.state.actorSearch || '').toLowerCase();
+    const sevFilter = this.state.actorSeverityFilter || 'all';
+    const actorsFiltered = actorsView.filter(a => {
+      const matchesSearch = !search || a.name.toLowerCase().includes(search) || a.country.toLowerCase().includes(search) || (a.aliases||[]).some(al=>al.toLowerCase().includes(search));
+      const matchesSev = sevFilter === 'all' || a.severity === sevFilter;
+      return matchesSearch && matchesSev;
+    });
+    const severityChips = [{id:'all', name:'All'}, {id:'critical', name:'Critical'}, {id:'high', name:'High'}, {id:'medium', name:'Medium'}, {id:'low', name:'Low'}].map(c => ({
+      id: c.id, name: c.name,
+      chipStyle: c.id === sevFilter
+        ? `padding:6px 13px;border-radius:16px;font-size:12.5px;font-weight:600;cursor:pointer;background:${accentTint};color:${accent};border:1px solid ${accent}`
+        : 'padding:6px 13px;border-radius:16px;font-size:12.5px;font-weight:500;cursor:pointer;background:#fff;color:#4b5563;border:1px solid #e5e7eb',
+      onClick: () => self.setActorSeverityFilter(c.id)
+    }));
+
+    const countryCounts = {};
+    this.actors.forEach(a => { countryCounts[a.country] = (countryCounts[a.country]||0) + 1; });
+    const countryBreakdown = Object.keys(countryCounts).sort((x,y)=>countryCounts[y]-countryCounts[x]).map(country => {
+      const repActor = this.actors.find(a=>a.country===country);
+      const count = countryCounts[country];
+      return { country, count, plural: count===1?'':'s', dotStyle: `width:9px;height:9px;border-radius:50%;background:${SEV[repActor.severity].dot}` };
+    });
+    const selectedActorRaw = this.actors.find(a=>a.id===this.state.selectedActorId) || this.actors[0];
+    const selectedActor = enrichActor(selectedActorRaw);
+    selectedActor.sectorBars = selectedActorRaw.sectorBars.map(sb => ({...sb, barStyle:`height:100%;background:#4338ca;border-radius:3px;width:${sb.pct}%`}));
+    selectedActor.relatedCampaigns = this.campaignsAll.filter(c => c.actorId === selectedActorRaw.id).map(rc => ({...rc, statusStyle: rc.status==='active' ? 'background:#f0fdf4;color:#15803d;font-size:11px;font-weight:600;text-transform:uppercase;padding:4px 9px;border-radius:5px' : 'background:#f3f4f6;color:#6b7280;font-size:11px;font-weight:600;text-transform:uppercase;padding:4px 9px;border-radius:5px', onClick: () => self.goToCampaign(rc.id)}));
+    selectedActor.timeline = selectedActorRaw.timeline.map((ev,i) => ({...ev, dotStyle:`width:9px;height:9px;border-radius:50%;background:#4338ca;flex:none;margin-top:4px`, lineStyle: i < selectedActorRaw.timeline.length-1 ? 'width:1px;flex:1;background:#e5e7eb;margin-top:4px' : ''}));
+
+    const kpis = [
+      {label:'Active Campaigns', value:'47', delta:'+6 this week', deltaColor:'#dc2626'},
+      {label:'Tracked Threat Actors', value:'182', delta:'+3 new', deltaColor:'#6b7280'},
+      {label:'Open IOCs', value:'3,214', delta:'+128 today', deltaColor:'#6b7280'},
+      {label:'ATT&CK Coverage', value:'68%', delta:'+2pts this month', deltaColor:'#15803d'}
+    ];
+
+    const geoMarkers = this.geoMarkersRaw.map(m => ({
+      label: m.label,
+      wrapStyle: `position:absolute;top:${m.top};left:${m.left};display:flex;align-items:center;justify-content:center`,
+      ringStyle: `position:absolute;width:9px;height:9px;border-radius:50%;background:${SEV[m.sev].ring};animation:pulseRing 2.2s ease-out infinite`,
+      dotStyle: `position:relative;width:9px;height:9px;border-radius:50%;background:${SEV[m.sev].dot};box-shadow:0 0 0 3px #fff`,
+      labelStyle: `position:absolute;left:14px;font-size:10.5px;font-weight:600;color:#374151;white-space:nowrap`
+    }));
+
+    const geoLegend = ['critical','high','medium','low'].map(sev => ({
+      label: sev.charAt(0).toUpperCase()+sev.slice(1),
+      dotStyle: `width:8px;height:8px;border-radius:50%;background:${SEV[sev].dot}`
+    }));
+
+    const iocs = this.iocsGlobal.map(i => ({
+      ...i,
+      typeColor: IOC_COLOR[i.type] || '#6b7280',
+      confStyle: `font-size:10.5px;font-weight:600;color:${i.confidence==='High'?'#15803d':i.confidence==='Medium'?'#b45309':'#6b7280'}`
+    }));
+
+    const tactics = this.tacticsFull.slice(0,6).map(t => ({
+      name: t.name,
+      techniques: t.techniques.slice(0,4).map(tech => ({ name:tech.name, cellStyle:`height:26px;border-radius:4px;background:${self.cellColor(self.techLevel(tech.id,'all'))}` }))
+    }));
+
+    const attackFilterId = this.state.attackFilterActorId;
+    const attackChips = [{id:'all', name:'All Actors'}, ...this.coverageActors().map(a=>({id:a.id, name:a.name}))].map(c => ({
+      id: c.id, name: c.name,
+      chipStyle: c.id === attackFilterId
+        ? `background:${accent};color:#fff;font-size:12px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer;flex:none`
+        : 'background:#f3f4f6;color:#4b5563;font-size:12px;font-weight:500;padding:7px 14px;border-radius:7px;cursor:pointer;flex:none',
+      onClick: () => self.setAttackFilter(c.id)
+    }));
+    const matrixFull = this.tacticsFull.map(t => ({
+      name: t.name,
+      techniques: t.techniques.map(tech => {
+        const lvl = self.techLevel(tech.id, attackFilterId);
+        return { id: tech.id, name: tech.name, cellStyle:`background:${self.cellColor(lvl)};border-radius:6px;padding:8px 9px;display:flex;flex-direction:column;gap:2px;${lvl>=2?'color:#fff':'color:#374151'}` };
+      })
+    }));
+    const matrixStats = (() => {
+      const all = this.tacticsFull.flatMap(t=>t.techniques);
+      const covered = all.filter(tech => self.techLevel(tech.id,'all') > 0).length;
+      return { covered, total: all.length, pct: Math.round((covered/all.length)*100) };
+    })();
+
+    const iocTypeOptions = ['All','IP','DOMAIN','HASH','URL'];
+    const iocTypeChips = iocTypeOptions.map(t => ({
+      label: t,
+      chipStyle: t === this.state.iocTypeFilter
+        ? `background:${accent};color:#fff;font-size:12px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer;flex:none`
+        : 'background:#f3f4f6;color:#4b5563;font-size:12px;font-weight:500;padding:7px 14px;border-radius:7px;cursor:pointer;flex:none',
+      onClick: () => self.setIocFilter(t)
+    }));
+    const iocViewState = this.props.iocViewState || 'default';
+    const isIocLoading = iocViewState === 'loading';
+    const iocsFull = iocViewState === 'empty' ? [] : this.iocsGlobal
+      .filter(i => this.state.iocTypeFilter === 'All' || i.type === this.state.iocTypeFilter)
+      .map(i => ({
+        ...i,
+        typeColor: IOC_COLOR[i.type] || '#6b7280',
+        actorLinkStyle: `color:${accent};font-weight:500`,
+        confStyle: `font-size:11px;font-weight:600;color:${i.confidence==='High'?'#15803d':i.confidence==='Medium'?'#b45309':'#6b7280'}`
+      }));
+    const isIocEmpty = !isIocLoading && iocsFull.length === 0;
+    const skeletonRows = [1,2,3,4,5];
+
+    const isIocs = this.state.view === 'iocs';
+    const isAttack = this.state.view === 'attack';
+    const isCampaign = this.state.view === 'campaign';
+    const isReports = this.state.view === 'reports';
+    const isActors = this.state.view === 'actors';
+    const isCampaignsList = this.state.view === 'campaigns-list';
+    const isGeo = this.state.view === 'geo';
+    const navCampaignsStyle = `display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:7px;font-size:13.5px;font-weight:500;cursor:pointer;${isCampaignsList?`background:${accentTint};color:${accent}`:'color:#4b5563'}`;
+    const navGeoStyle = `display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:7px;font-size:13.5px;font-weight:500;cursor:pointer;${isGeo?`background:${accentTint};color:${accent}`:'color:#4b5563'}`;
+    const navActorsStyle = `display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:7px;font-size:13.5px;font-weight:500;cursor:pointer;${isActors?`background:${accentTint};color:${accent}`:'color:#4b5563'}`;
+    const navOverviewStyle = `display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:7px;font-size:13.5px;font-weight:500;cursor:pointer;${(this.state.view==='dashboard'||this.state.view==='detail'||isCampaign)?`background:${accentTint};color:${accent}`:'color:#4b5563'}`;
+    const navIocStyle = `display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:7px;font-size:13.5px;font-weight:500;cursor:pointer;${isIocs?`background:${accentTint};color:${accent}`:'color:#4b5563'}`;
+    const navAttackStyle = `display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:7px;font-size:13.5px;font-weight:500;cursor:pointer;${isAttack?`background:${accentTint};color:${accent}`:'color:#4b5563'}`;
+    const navReportsStyle = `display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:7px;font-size:13.5px;font-weight:500;cursor:pointer;${isReports?`background:${accentTint};color:${accent}`:'color:#4b5563'}`;
+
+    const statusStyleFor = (status) => status==='active' ? 'background:#f0fdf4;color:#15803d;font-size:11px;font-weight:600;text-transform:uppercase;padding:4px 9px;border-radius:5px' : 'background:#f3f4f6;color:#6b7280;font-size:11px;font-weight:600;text-transform:uppercase;padding:4px 9px;border-radius:5px';
+
+    const campaigns = this.dashboardCampaignIds.map(id => {
+      const c = this.campaignsAll.find(x => x.id === id);
+      const cActor = this.actors.find(a => a.id === c.actorId);
+      return { ...c, actor: cActor.name, actorLinkStyle: `color:${accent};font-weight:500`, statusStyle: statusStyleFor(c.status), onClick: () => self.goToCampaign(c.id) };
+    });
+
+    const campaignsFull = this.campaignsAll.map(c => {
+      const cActor = this.actors.find(a => a.id === c.actorId);
+      return { ...c, actor: cActor.name, actorLinkStyle: `color:${accent};font-weight:500`, statusStyle: statusStyleFor(c.status), onClick: () => self.goToCampaign(c.id) };
+    });
+
+    const selectedCampaignRaw = this.campaignsAll.find(c => c.id === this.state.selectedCampaignId) || this.campaignsAll[0];
+    const campActor = this.actors.find(a => a.id === selectedCampaignRaw.actorId);
+    const campLinkedIocs = this.iocsGlobal.filter(i => i.actor === campActor.name).slice(0,4).map(i => ({...i, typeColor: IOC_COLOR[i.type] || '#6b7280'}));
+    const selectedCampaign = {
+      ...selectedCampaignRaw,
+      statusBadgeStyle: selectedCampaignRaw.status==='active' ? 'background:#f0fdf4;color:#15803d;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;padding:4px 10px;border-radius:5px' : 'background:#f3f4f6;color:#6b7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;padding:4px 10px;border-radius:5px',
+      actorName: campActor.name,
+      actorSevDotStyle: dotStyle(campActor.severity, 9),
+      confidence: campActor.confidence,
+      overview: `${selectedCampaignRaw.name} is ${selectedCampaignRaw.status==='active' ? 'an active' : 'a dormant'} campaign attributed to ${campActor.name}, targeting the ${selectedCampaignRaw.sector} sector. First observed ${selectedCampaignRaw.firstSeen}, with activity most recently logged ${selectedCampaignRaw.lastActivity}.`,
+      ttps: campActor.ttps.slice(0,6).map(t => ({ id: t, style: ttpBadgeStyle })),
+      linkedIocs: campLinkedIocs,
+      iocCount: campLinkedIocs.length,
+      timeline: campActor.timeline.slice(0,3).map((ev,i) => ({...ev, dotStyle:`width:9px;height:9px;border-radius:50%;background:${accent};flex:none;margin-top:4px`, lineStyle: i<2 ? 'width:1px;flex:1;background:#e5e7eb;margin-top:4px' : ''})),
+      goToActorClick: () => self.goToActor(campActor.id)
+    };
+
+    const reportsRows = this.reportsList.map(r => ({...r, formatStyle: `font-size:11px;font-weight:600;color:${accent};background:${accentTint};padding:3px 9px;border-radius:5px`}));
+
+    const actorStats = [
+      {label:'Active Campaigns', value:String(selectedActorRaw.campaigns)},
+      {label:'Associated IOCs', value:String(selectedActorRaw.iocs.length ? selectedActorRaw.iocs.length : selectedActorRaw.iocs)},
+      {label:'ATT&CK Techniques', value:String(selectedActorRaw.techniques)},
+      {label:'Attribution Confidence', value:selectedActorRaw.confidence}
+    ];
+
+    const relatedActors = actorsView.filter(a => a.id !== selectedActorRaw.id).slice(0,3);
+
+    return {
+      view: this.state.view,
+      isDashboard: this.state.view === 'dashboard',
+      isDetail: this.state.view === 'detail',
+      isIocs, isAttack, isCampaign, isReports, isActors, isCampaignsList, isGeo,
+      isIocLoading, isIocEmpty, skeletonRows,
+      navOverviewStyle, navIocStyle, navAttackStyle, navReportsStyle, navActorsStyle, navCampaignsStyle, navGeoStyle,
+      accentColor: accent, ttpBadgeStyle,
+      goToDashboard: () => self.goToView('dashboard'),
+      goToActors: () => self.goToView('actors'),
+      goToIocs: () => self.goToView('iocs'),
+      goToAttack: () => self.goToView('attack'),
+      goToReports: () => self.goToView('reports'),
+      goToCampaigns: () => self.goToView('campaigns-list'),
+      goToGeo: () => self.goToView('geo'),
+      kpis, actors: actorsView, geoMarkers, geoLegend, tactics, campaigns, iocs,
+      actorSearchValue: this.state.actorSearch || '', setActorSearch: (e) => self.setActorSearch(e), actorsFiltered, severityChips,
+      campaignsFull, countryBreakdown,
+      selectedActor, actorStats, relatedActors,
+      attackChips, matrixFull, matrixStats,
+      iocTypeChips, iocsFull,
+      selectedCampaign, reportsRows,
+      goBack: () => this.goBack()
+    };
+  }
+}
+
+</script>
+</body>
+</html>
