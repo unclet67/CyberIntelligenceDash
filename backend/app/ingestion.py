@@ -1,11 +1,20 @@
 import re
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Iterable
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from .models import Actor, ActorAlias, Indicator, IngestionRun, Source, Technique
+from .models import Actor, ActorAlias, ActorSource, Indicator, IngestionRun, Source, Technique
+
+
+COUNTRY_NAMES = {
+    "CN": "China",
+    "IR": "Iran",
+    "KP": "North Korea",
+    "RU": "Russia",
+    "US": "United States",
+}
 
 
 def _external_reference(item: dict[str, Any], prefix: str) -> str | None:
@@ -31,6 +40,134 @@ def _indicator_parts(pattern: str) -> tuple[str, str]:
     return indicator_type, match.group(1) if match else pattern
 
 
+def _source_and_run(
+    session: Session, *, source_name: str, source_url: str | None, items_seen: int
+) -> tuple[Source, int]:
+    source = session.scalar(select(Source).where(Source.name == source_name))
+    if source is None:
+        source = Source(name=source_name, url=source_url)
+        session.add(source)
+    elif source_url:
+        source.url = source_url
+    session.flush()
+    run = IngestionRun(
+        source=source,
+        started_at=datetime.now(timezone.utc),
+        status="running",
+        items_seen=items_seen,
+    )
+    session.add(run)
+    session.commit()
+    return source, run.id
+
+
+def _finish_run(session: Session, run_id: int, items_written: int) -> IngestionRun:
+    run = session.get(IngestionRun, run_id)
+    if run is None:
+        raise RuntimeError("Ingestion audit record disappeared")
+    run.status = "completed"
+    run.items_written = items_written
+    run.completed_at = datetime.now(timezone.utc)
+    session.commit()
+    return run
+
+
+def _fail_run(session: Session, run_id: int, exc: Exception) -> None:
+    session.rollback()
+    run = session.get(IngestionRun, run_id)
+    if run is None:
+        return
+    run.status = "failed"
+    run.error = str(exc)[:4000]
+    run.completed_at = datetime.now(timezone.utc)
+    session.commit()
+
+
+def _clean_names(values: Iterable[Any]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        name = value.strip()[:160]
+        key = name.casefold()
+        if name and key not in seen:
+            seen.add(key)
+            result.append(name)
+    return result
+
+
+def _as_list(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return list(value)
+    return [value]
+
+
+def _find_actor(
+    session: Session,
+    *,
+    source: Source,
+    external_id: str,
+    mitre_id: str | None,
+    names: list[str],
+) -> Actor | None:
+    actor = session.scalar(
+        select(Actor)
+        .join(ActorSource)
+        .where(ActorSource.source_id == source.id, ActorSource.external_id == external_id)
+    )
+    if actor is not None:
+        return actor
+    if mitre_id:
+        actor = session.scalar(select(Actor).where(Actor.mitre_id == mitre_id))
+        if actor is not None:
+            return actor
+    normalized = [name.casefold() for name in names]
+    if not normalized:
+        return None
+    return session.scalar(
+        select(Actor)
+        .outerjoin(ActorAlias)
+        .where(or_(func.lower(Actor.name).in_(normalized), func.lower(ActorAlias.name).in_(normalized)))
+        .limit(1)
+    )
+
+
+def _record_actor_source(
+    session: Session,
+    *,
+    actor: Actor,
+    source: Source,
+    external_id: str,
+    profile_url: str | None,
+) -> ActorSource:
+    profile = session.scalar(
+        select(ActorSource).where(
+            ActorSource.actor_id == actor.id,
+            ActorSource.source_id == source.id,
+        )
+    )
+    if profile is None:
+        profile = ActorSource(actor=actor, source=source, external_id=external_id)
+        session.add(profile)
+    else:
+        profile.external_id = external_id
+    profile.profile_url = profile_url
+    profile.last_synced_at = datetime.now(timezone.utc)
+    return profile
+
+
+def _merge_aliases(actor: Actor, names: Iterable[Any]) -> None:
+    known = {actor.name.casefold(), *(alias.name.casefold() for alias in actor.aliases)}
+    for alias in _clean_names(names):
+        key = alias.casefold()
+        if key not in known:
+            actor.aliases.append(ActorAlias(name=alias))
+            known.add(key)
+
+
 def ingest_stix_bundle(
     session: Session,
     bundle: dict[str, Any],
@@ -41,24 +178,9 @@ def ingest_stix_bundle(
     if bundle.get("type") != "bundle" or not isinstance(bundle.get("objects"), list):
         raise ValueError("Expected a STIX bundle with an objects array")
 
-    source = session.scalar(select(Source).where(Source.name == source_name))
-    if source is None:
-        source = Source(name=source_name, url=source_url)
-        session.add(source)
-    elif source_url:
-        source.url = source_url
-    session.flush()
-
-    run = IngestionRun(
-        source=source,
-        started_at=datetime.now(timezone.utc),
-        status="running",
-        items_seen=len(bundle["objects"]),
+    source, run_id = _source_and_run(
+        session, source_name=source_name, source_url=source_url, items_seen=len(bundle["objects"])
     )
-    session.add(run)
-    session.commit()
-    run_id = run.id
-
     actor_by_stix: dict[str, Actor] = {}
     technique_by_stix: dict[str, Technique] = {}
     written = 0
@@ -72,10 +194,14 @@ def ingest_stix_bundle(
             if object_type == "intrusion-set":
                 mitre_id = _external_reference(item, "G")
                 name = str(item.get("name") or stix_id)
-                actor_conditions = [Actor.external_id == stix_id, Actor.name == name]
-                if mitre_id:
-                    actor_conditions.append(Actor.mitre_id == mitre_id)
-                actor = session.scalar(select(Actor).where(or_(*actor_conditions)))
+                names = _clean_names([name, *_as_list(item.get("aliases"))])
+                actor = _find_actor(
+                    session,
+                    source=source,
+                    external_id=stix_id,
+                    mitre_id=mitre_id,
+                    names=names,
+                )
                 if actor is None:
                     actor = Actor(
                         id=mitre_id or f"stix-{stix_id.split('--')[-1][:24]}",
@@ -91,15 +217,22 @@ def ingest_stix_bundle(
                         source=source,
                     )
                     session.add(actor)
+                    session.flush()
                 else:
-                    actor.external_id = stix_id
-                    actor.source = source
+                    if mitre_id and not actor.mitre_id:
+                        actor.mitre_id = mitre_id
+                    if not actor.external_id or actor.external_id.startswith("demo:"):
+                        actor.external_id = stix_id
                     if item.get("description"):
                         actor.description = str(item["description"])
-                known_aliases = {alias.name for alias in actor.aliases}
-                for alias in item.get("aliases", []):
-                    if isinstance(alias, str) and alias not in known_aliases and alias != actor.name:
-                        actor.aliases.append(ActorAlias(name=alias))
+                _merge_aliases(actor, names)
+                _record_actor_source(
+                    session,
+                    actor=actor,
+                    source=source,
+                    external_id=stix_id,
+                    profile_url=f"https://attack.mitre.org/groups/{mitre_id}/" if mitre_id else source_url,
+                )
                 actor_by_stix[stix_id] = actor
                 written += 1
 
@@ -154,18 +287,114 @@ def ingest_stix_bundle(
             technique = technique_by_stix.get(str(item.get("target_ref")))
             if actor and technique and technique not in actor.techniques:
                 actor.techniques.append(technique)
-
-        run = session.get(IngestionRun, run_id)
-        run.status = "completed"
-        run.items_written = written
-        run.completed_at = datetime.now(timezone.utc)
-        session.commit()
-        return run
+        return _finish_run(session, run_id, written)
     except Exception as exc:
-        session.rollback()
-        failed_run = session.get(IngestionRun, run_id)
-        failed_run.status = "failed"
-        failed_run.error = str(exc)[:4000]
-        failed_run.completed_at = datetime.now(timezone.utc)
-        session.commit()
+        _fail_run(session, run_id, exc)
+        raise
+
+
+def _malpedia_records(payload: Any) -> list[tuple[str, dict[str, Any]]]:
+    if isinstance(payload, dict) and isinstance(payload.get("actors"), (dict, list)):
+        payload = payload["actors"]
+    if isinstance(payload, dict):
+        return [(str(key), value) for key, value in payload.items() if isinstance(value, dict)]
+    if isinstance(payload, list):
+        records = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            actor_id = item.get("id") or item.get("actor_id") or item.get("slug")
+            if actor_id:
+                records.append((str(actor_id), item))
+        return records
+    raise ValueError("Expected Malpedia actor metadata as an object or array")
+
+
+def _malpedia_mitre_id(record: dict[str, Any], meta: dict[str, Any]) -> str | None:
+    candidates = [
+        record.get("mitre_id"),
+        record.get("mitre-attack"),
+        meta.get("mitre_id"),
+        meta.get("mitre-attack"),
+        meta.get("external_id"),
+    ]
+    match = re.search(r"\bG\d{4}\b", " ".join(str(value) for value in candidates if value), re.IGNORECASE)
+    if match:
+        return match.group(0).upper()
+    for reference in _as_list(meta.get("refs")):
+        match = re.search(r"/groups/(G\d{4})", str(reference), re.IGNORECASE)
+        if match:
+            return match.group(1).upper()
+    return None
+
+
+def ingest_malpedia_actors(
+    session: Session,
+    payload: Any,
+    *,
+    source_name: str = "Malpedia",
+    source_url: str = "https://malpedia.caad.fkie.fraunhofer.de",
+) -> IngestionRun:
+    records = _malpedia_records(payload)
+    source, run_id = _source_and_run(
+        session, source_name=source_name, source_url=source_url, items_seen=len(records)
+    )
+    written = 0
+    try:
+        for external_id, record in records:
+            external_id = external_id.strip()[:160]
+            meta = record.get("meta") if isinstance(record.get("meta"), dict) else {}
+            name = str(record.get("value") or record.get("name") or meta.get("name") or external_id).strip()[:160]
+            aliases = _clean_names([
+                name,
+                *_as_list(record.get("synonyms")),
+                *_as_list(record.get("aliases")),
+                *_as_list(meta.get("synonyms")),
+                *_as_list(meta.get("aliases")),
+            ])
+            mitre_id = _malpedia_mitre_id(record, meta)
+            actor = _find_actor(
+                session,
+                source=source,
+                external_id=external_id,
+                mitre_id=mitre_id,
+                names=aliases,
+            )
+            if actor is None:
+                actor_id = f"malpedia-{re.sub(r'[^a-z0-9_-]+', '-', external_id.casefold())}"[:64]
+                actor = Actor(
+                    id=actor_id,
+                    name=name,
+                    mitre_id=mitre_id,
+                    country="Unknown",
+                    sponsor="Unattributed",
+                    motivation="Unknown",
+                    severity="medium",
+                    confidence="Medium",
+                    description=str(record.get("description") or meta.get("description") or "Imported Malpedia actor profile."),
+                    source=source,
+                )
+                session.add(actor)
+                session.flush()
+            elif mitre_id and not actor.mitre_id:
+                actor.mitre_id = mitre_id
+
+            country = meta.get("country") or record.get("country")
+            if actor.country == "Unknown" and isinstance(country, str) and country.strip():
+                actor.country = COUNTRY_NAMES.get(country.strip().upper(), country.strip())
+            sponsor = meta.get("cfr-suspected-state-sponsor") or meta.get("suspected-state-sponsor")
+            if actor.sponsor == "Unattributed" and isinstance(sponsor, str) and sponsor.strip():
+                actor.sponsor = sponsor.strip()
+            _merge_aliases(actor, aliases)
+            _record_actor_source(
+                session,
+                actor=actor,
+                source=source,
+                external_id=external_id,
+                profile_url=f"{source_url.rstrip('/')}/actor/{external_id}",
+            )
+            written += 1
+        return _finish_run(session, run_id, written)
+    except Exception as exc:
+        _fail_run(session, run_id, exc)
         raise

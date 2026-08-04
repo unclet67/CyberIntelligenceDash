@@ -30,12 +30,14 @@ services:
 
   worker:
     build: ./backend
-    command: ["python", "-m", "app.worker"]
+    command: ["python", "-m", "app.worker", "--source", "all"]
     restart: unless-stopped
     environment:
       ENVIRONMENT: production
       DATABASE_URL: postgresql+psycopg://cyberintel:${POSTGRES_PASSWORD}@db:5432/cyberintel
-      STIX_FEED_URL: ${STIX_FEED_URL:?set STIX_FEED_URL}
+      MITRE_STIX_URL: ${MITRE_STIX_URL:-https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json}
+      MALPEDIA_BASE_URL: ${MALPEDIA_BASE_URL:-https://malpedia.caad.fkie.fraunhofer.de}
+      MALPEDIA_API_TOKEN: ${MALPEDIA_API_TOKEN:-}
       INGESTION_INTERVAL_SECONDS: ${INGESTION_INTERVAL_SECONDS:-3600}
     depends_on:
       api:

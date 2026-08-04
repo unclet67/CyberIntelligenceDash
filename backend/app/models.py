@@ -35,6 +35,9 @@ class Actor(Base):
     campaigns: Mapped[list["Campaign"]] = relationship(back_populates="actor")
     indicators: Mapped[list["Indicator"]] = relationship(back_populates="actor")
     source: Mapped["Source | None"] = relationship(back_populates="actors")
+    source_profiles: Mapped[list["ActorSource"]] = relationship(
+        back_populates="actor", cascade="all, delete-orphan"
+    )
 
 
 class ActorAlias(Base):
@@ -90,6 +93,31 @@ class Source(Base):
     actors: Mapped[list[Actor]] = relationship(back_populates="source")
     indicators: Mapped[list["Indicator"]] = relationship(back_populates="source")
     ingestion_runs: Mapped[list["IngestionRun"]] = relationship(back_populates="source")
+    actor_profiles: Mapped[list["ActorSource"]] = relationship(
+        back_populates="source", cascade="all, delete-orphan"
+    )
+
+
+class ActorSource(Base):
+    __tablename__ = "actor_sources"
+    __table_args__ = (
+        UniqueConstraint("source_id", "external_id", name="uq_actor_sources_external_identity"),
+        UniqueConstraint("actor_id", "source_id", name="uq_actor_sources_actor_source"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    actor_id: Mapped[str] = mapped_column(ForeignKey("actors.id", ondelete="CASCADE"), index=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), index=True)
+    external_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    profile_url: Mapped[str | None] = mapped_column(String(1000))
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    actor: Mapped[Actor] = relationship(back_populates="source_profiles")
+    source: Mapped[Source] = relationship(back_populates="actor_profiles")
+
+    @property
+    def source_name(self) -> str:
+        return self.source.name
 
 
 class Indicator(Base):

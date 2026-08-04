@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from .auth import require_api_token
 from .database import get_db
-from .models import Actor, Campaign, Indicator, IngestionRun, Report, Technique
+from .models import Actor, ActorSource, Campaign, Indicator, IngestionRun, Report, Technique
 from .schemas import (
     ActorDetail,
     ActorSummary,
@@ -21,6 +21,15 @@ router = APIRouter(prefix="/api")
 data_router = APIRouter(prefix="/api", dependencies=[Depends(require_api_token)])
 
 
+def _actor_loading():
+    return (
+        selectinload(Actor.aliases),
+        selectinload(Actor.techniques),
+        selectinload(Actor.events),
+        selectinload(Actor.source_profiles).selectinload(ActorSource.source),
+    )
+
+
 @router.get("/health", response_model=HealthOut)
 def health(session: Session = Depends(get_db)) -> HealthOut:
     session.execute(text("SELECT 1"))
@@ -33,7 +42,11 @@ def list_actors(
     search: str | None = None,
     session: Session = Depends(get_db),
 ) -> list[Actor]:
-    statement = select(Actor).order_by(Actor.name)
+    statement = (
+        select(Actor)
+        .options(selectinload(Actor.source_profiles).selectinload(ActorSource.source))
+        .order_by(Actor.name)
+    )
     if severity:
         statement = statement.where(Actor.severity == severity.lower())
     if search:
@@ -43,12 +56,7 @@ def list_actors(
 
 @data_router.get("/actors/{actor_id}", response_model=ActorDetail)
 def get_actor(actor_id: str, session: Session = Depends(get_db)) -> Actor:
-    statement = (
-        select(Actor)
-        .where(Actor.id == actor_id)
-        .options(selectinload(Actor.aliases), selectinload(Actor.techniques), selectinload(Actor.events))
-    )
-    actor = session.scalar(statement)
+    actor = session.scalar(select(Actor).where(Actor.id == actor_id).options(*_actor_loading()))
     if actor is None:
         raise HTTPException(status_code=404, detail="Actor not found")
     return actor
@@ -101,13 +109,7 @@ def list_reports(session: Session = Depends(get_db)) -> list[Report]:
 
 @data_router.get("/dashboard/bootstrap", response_model=DashboardBootstrap)
 def dashboard_bootstrap(session: Session = Depends(get_db)) -> DashboardBootstrap:
-    actors = list(
-        session.scalars(
-            select(Actor)
-            .options(selectinload(Actor.aliases), selectinload(Actor.techniques), selectinload(Actor.events))
-            .order_by(Actor.name)
-        )
-    )
+    actors = list(session.scalars(select(Actor).options(*_actor_loading()).order_by(Actor.name)))
     campaigns = list(session.scalars(select(Campaign).order_by(Campaign.name)))
     indicators = list(
         session.scalars(

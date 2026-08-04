@@ -2,7 +2,7 @@
 
 The backend provides a read-only FastAPI service, PostgreSQL-compatible data
 models, versioned migrations, seeded demonstration records, optional bearer
-authentication, and a STIX ingestion worker.
+authentication, and source-aware MITRE ATT&CK and Malpedia ingestion.
 
 ## Local API
 
@@ -18,7 +18,7 @@ uvicorn app.main:app --reload --port 8001
 
 Open `http://127.0.0.1:8001/docs` for interactive API documentation. The
 dashboard served on port `8000` automatically loads `/api/dashboard/bootstrap`
-and falls back to its bundled demonstration arrays when the API is unavailable.
+and falls back to bundled demonstration records when the API is unavailable.
 
 ## PostgreSQL development stack
 
@@ -30,30 +30,62 @@ docker compose up --build
 
 The API is available at `http://127.0.0.1:8001`.
 
-## STIX ingestion worker
+## MITRE and Malpedia sync
 
-Ingest one local STIX 2.1 bundle:
+Run both source adapters once:
 
 ```bash
 cd backend
-python -m app.worker --once --file /path/to/bundle.json
+python -m app.worker --once --source all
 ```
 
-Ingest one remote bundle:
+Run a single adapter:
 
 ```bash
-python -m app.worker --once --url https://approved.example/bundle.json
+python -m app.worker --once --source mitre
+python -m app.worker --once --source malpedia
 ```
 
-To run the scheduled development worker, set `STIX_FEED_URL` and use:
+Configuration:
+
+```dotenv
+MITRE_STIX_URL=https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json
+MALPEDIA_BASE_URL=https://malpedia.caad.fkie.fraunhofer.de
+MALPEDIA_API_TOKEN=
+INGESTION_INTERVAL_SECONDS=3600
+```
+
+Malpedia actor endpoints do not require registration. If a token is provided,
+the backend sends `Authorization: apitoken <token>` as documented by Malpedia.
+Never put this token in `index.html` or another browser-delivered file.
+
+The identity merge order is:
+
+1. Existing source external ID
+2. MITRE ATT&CK group ID
+3. Case-insensitive canonical name or alias
+4. New actor profile
+
+Each actor may have multiple `actor_sources` records. These retain the source
+name, external ID, public profile URL, and last successful sync time. MITRE
+contributes descriptions and ATT&CK technique relationships; Malpedia enriches
+aliases, country/sponsor metadata when existing fields are unknown, and its
+actor profile link. Empty source fields never erase populated actor fields.
+
+To run scheduled syncs in Docker:
 
 ```bash
 docker compose --profile ingestion up --build
 ```
 
-The worker upserts intrusion sets, ATT&CK techniques, indicators, and `uses`
-relationships. Every attempt is recorded in `ingestion_runs` with status and
-item counts.
+The legacy custom STIX workflow remains available:
+
+```bash
+python -m app.worker --once --source stix --file /path/to/bundle.json
+python -m app.worker --once --source stix --url https://approved.example/bundle.json
+```
+
+Every attempt is recorded in `ingestion_runs` with status and item counts.
 
 ## Authentication
 
@@ -79,6 +111,17 @@ response and keeps it in browser session storage only.
 - `GET /api/attack/techniques`
 - `GET /api/reports`
 - `GET /api/ingestion/runs`
+
+Actor responses include `source_profiles`, for example:
+
+```json
+{
+  "source_name": "Malpedia",
+  "external_id": "apt28",
+  "profile_url": "https://malpedia.caad.fkie.fraunhofer.de/actor/apt28",
+  "last_synced_at": "2026-08-04T18:00:00Z"
+}
+```
 
 ## Migrations and tests
 
