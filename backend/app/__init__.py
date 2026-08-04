@@ -1,0 +1,1 @@
+"""ARGUS TI backend application."""
