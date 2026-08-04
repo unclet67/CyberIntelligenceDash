@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>ARGUS TI — Threat Intelligence Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --display:'Space Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  }
+  html{color-scheme:light}
+  body{margin:0;background:#f5f6f8;font-family:var(--sans);color:#111827;-webkit-font-smoothing:antialiased}
+  a{color:#4338ca;text-decoration:none}
+  a:hover{color:#3730a3;text-decoration:underline}
+  *{box-sizing:border-box}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:4px}
+  input{font-family:var(--sans)}
+  @keyframes pulseRing{0%{transform:scale(0.6);opacity:.7}100%{transform:scale(2.2);opacity:0}}
+  .row-hover{transition:background .12s ease}
+  .row-hover:hover{background:#f9fafb}
+  .card-hover{transition:border-color .12s ease}
+  .card-hover:hover{border-color:#c7d2fe}
+  .nav-item:hover{background:#f3f4f6}
+  .clickable{cursor:pointer}
+  [data-act]{cursor:pointer}
+  a:focus-visible,[data-act]:focus-visible,input:focus-visible{outline:2px solid #4338ca;outline-offset:2px;border-radius:6px}
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+"use strict";
+
+/* ============================================================
+   ARGUS TI — Threat Intelligence Dashboard
+   Standalone port. No external runtime, no build step.
+   ============================================================ */
+
+const SEV = {
+  critical: {bg:'#fef2f2', text:'#b91c1c', dot:'#dc2626', ring:'#dc2626'},
+  high:     {bg:'#fff7ed', text:'#c2410c', dot:'#ea580c', ring:'#ea580c'},
+  medium:   {bg:'#fffbeb', text:'#b45309', dot:'#d97706', ring:'#d97706'},
+  low:      {bg:'#f0fdf4', text:'#15803d', dot:'#16a34a', ring:'#16a34a'}
+};
+const IOC_COLOR = {IP:'#0d9488', DOMAIN:'#4338ca', HASH:'#b45309', URL:'#0d9488'};
+
+function tint(hex){
+  const h=hex.replace('#','');
+  const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
+  const mix=(c)=>Math.round(c+(255-c)*0.88);
+  return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
+}
+function badgeStyle(sev){
+  const c = SEV[sev] || SEV.medium;
+  return `background:${c.bg};color:${c.text};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;padding:4px 10px;border-radius:5px`;
+}
+function dotStyle(sev, size){
+  const c = SEV[sev] || SEV.medium;
+  return `width:${size||8}px;height:${size||8}px;border-radius:50%;background:${c.dot};flex:none`;
+}
+function esc(s){
+  return String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+/* ---------------- Data ---------------- */
+
+const ACCENT = '#4338ca';
+
+const actors = [
+  {id:'a1', name:'APT28', mitreId:'G0007', malpediaSlug:'apt28', aliases:['Fancy Bear','Sofacy','Sednit','Forest Blizzard'], country:'Russia', sponsor:'GRU Unit 26165', motivation:'Espionage', severity:'critical', campaigns:5, techniques:22, confidence:'High',
+   description:'APT28 is a Russian military intelligence (GRU) cyber espionage actor active since at least 2004, publicly tracked under aliases including Fancy Bear and Sofacy. The group targets government, military, and defense-sector networks across Europe and North America, using credential-harvesting phishing, zero-day exploitation, and custom malware frameworks such as X-Agent.',
+   ttps:['T1566.001','T1059.001','T1055','T1071.001','T1027','T1105','T1547.001','T1082'],
+   sectorBars:[{label:'Government', pct:52},{label:'Defense', pct:26},{label:'Media & NGOs', pct:14},{label:'Energy', pct:8}],
+   timeline:[{date:'Jul 29, 2026', title:'New C2 infrastructure identified', detail:'3 domains registered via same fast-flux DNS provider used in 2024 campaign.'},{date:'Jul 12, 2026', title:'Spear-phish wave detected', detail:'Targeted 14 government-sector entities in Poland and Romania.'},{date:'Jun 18, 2026', title:'New loader variant observed', detail:'Updated packer, same C2 protocol fingerprint as prior samples.'},{date:'Mar 02, 2026', title:'First observed activity (this cluster)', detail:'Attributed via infrastructure overlap with historical intrusion set.'}],
+   iocs:[{type:'IP', value:'185.220.101.42'},{type:'DOMAIN', value:'update-cdn-svc.net'},{type:'HASH', value:'e3b0c44298fc1c149afbf4c8'},{type:'IP', value:'91.219.237.18'}]},
+  {id:'a2', name:'APT33', mitreId:'G0064', malpediaSlug:'apt33', aliases:['Elfin','Refined Kitten','Magnallium'], country:'Iran', sponsor:'IRGC-linked', motivation:'Espionage', severity:'high', campaigns:3, techniques:16, confidence:'Medium',
+   description:'APT33 is an Iranian threat actor active since at least 2013, publicly tracked as Elfin and Refined Kitten. The group has targeted aviation, energy, and petrochemical organizations across the US, Saudi Arabia, and South Korea using spear-phishing, password-spraying, and destructive malware associated with follow-on sabotage.',
+   ttps:['T1566.001','T1110','T1078','T1136','T1021.002'],
+   sectorBars:[{label:'Energy', pct:45},{label:'Aviation', pct:33},{label:'Petrochemical', pct:22}],
+   timeline:[{date:'Jul 25, 2026', title:'Password-spray wave detected', detail:'Matches known APT33 targeting pattern against aviation-sector VPN portals.'},{date:'May 30, 2026', title:'Destructive payload observed', detail:'Deployed post-exfiltration against regional energy subsidiary.'}],
+   iocs:[{type:'DOMAIN', value:'secure-billing-portal.com'},{type:'HASH', value:'a94a8fe5ccb19ba61c4c087a'}]},
+  {id:'a3', name:'APT41', mitreId:'G0096', malpediaSlug:'apt41', aliases:['Double Dragon','BARIUM','Wicked Panda','Brass Typhoon'], country:'China', sponsor:'MSS-linked (dual espionage/financial)', motivation:'IP Theft', severity:'critical', campaigns:7, techniques:29, confidence:'High',
+   description:'APT41 is a China-based actor conducting both state-sponsored espionage and financially motivated operations, tracked under aliases including Double Dragon and Wicked Panda. The group compromises software supply chains and telecom providers, and is known for rapid weaponization of newly disclosed vulnerabilities.',
+   ttps:['T1195.002','T1505.003','T1071.001','T1046','T1078.004','T1560'],
+   sectorBars:[{label:'Telecom', pct:38},{label:'Manufacturing', pct:34},{label:'Healthcare', pct:28}],
+   timeline:[{date:'Jul 30, 2026', title:'Edge device web shells found', detail:'Consistent with prior APT41 persistence tradecraft.'},{date:'Jun 02, 2026', title:'Supply-chain compromise confirmed', detail:'Trojanized update package traced to build server intrusion.'}],
+   iocs:[{type:'IP', value:'103.224.182.9'},{type:'DOMAIN', value:'cdn-assets-sync.org'}]},
+  {id:'a4', name:'LAZARUS GROUP', mitreId:'G0032', malpediaSlug:'lazarus_group', aliases:['Hidden Cobra','Guardians of Peace','ZINC','Diamond Sleet'], country:'North Korea', sponsor:'Reconnaissance General Bureau', motivation:'Financial Gain', severity:'high', campaigns:4, techniques:18, confidence:'High',
+   description:'Lazarus Group is a North Korean state-sponsored actor operating under the Reconnaissance General Bureau, publicly tracked as Hidden Cobra and Diamond Sleet. The group funds state revenue through cryptocurrency theft and fraudulent remote-IT-worker schemes, targeting exchanges and fintech firms with social-engineering-led intrusions.',
+   ttps:['T1566.002','T1204.002','T1552.001','T1027.002'],
+   sectorBars:[{label:'Financial Services', pct:71},{label:'Technology', pct:29}],
+   timeline:[{date:'Jul 27, 2026', title:'Fake recruiter campaign detected', detail:'LinkedIn-based approach delivering trojanized coding test.'}],
+   iocs:[{type:'URL', value:'hxxps://npm-package-cdn.io/verify'}]},
+  {id:'a5', name:'APT-C-23', malpediaSlug:'apt_c_23', aliases:['Arid Viper','Desert Falcon','Two-tailed Scorpion'], country:'Unknown', sponsor:'Unattributed', motivation:'Espionage', severity:'medium', campaigns:2, techniques:11, confidence:'Low',
+   description:'APT-C-23 is a lower-confidence cluster publicly tracked as Arid Viper and Desert Falcon, linked to mobile and desktop espionage malware against Middle Eastern telecom and government targets since 2014. Attribution to a specific state sponsor remains unconfirmed, relying on shared infrastructure and code overlap rather than direct victim reporting.',
+   ttps:['T1595','T1590','T1589'],
+   sectorBars:[{label:'Telecom', pct:70},{label:'Government', pct:30}],
+   timeline:[{date:'Jul 08, 2026', title:'Passive DNS overlap identified', detail:'Shared registrar pattern with two prior scanning waves.'}],
+   iocs:[{type:'IP', value:'45.155.204.71'}]},
+  {id:'a6', name:'SANDWORM TEAM', mitreId:'G0034', malpediaSlug:'sandworm_team', aliases:['ELECTRUM','Telebots','Voodoo Bear','Seashell Blizzard'], country:'Russia', sponsor:'GRU Unit 74455', motivation:'Sabotage', severity:'low', campaigns:1, techniques:7, confidence:'Medium',
+   description:'Sandworm Team is a Russian GRU (Unit 74455) actor with a history of destructive attacks against Ukrainian power grid and industrial control systems, publicly tracked as ELECTRUM and Voodoo Bear. Activity currently tracked under this cluster is limited to low-volume reconnaissance scanning of exposed utility control interfaces, with no confirmed OT impact to date.',
+   ttps:['T0846','T0801'],
+   sectorBars:[{label:'Utilities', pct:100}],
+   timeline:[{date:'May 14, 2026', title:'ICS network scanning observed', detail:'Low-volume probing of exposed HMI interfaces.'}],
+   iocs:[{type:'IP', value:'194.32.78.5'}]},
+  {id:'a7', name:'APT29', mitreId:'G0016', malpediaSlug:'apt29', aliases:['Cozy Bear','The Dukes','Midnight Blizzard'], country:'Russia', sponsor:'SVR', motivation:'Espionage', severity:'critical', campaigns:2, techniques:19, confidence:'High',
+   description:'APT29 is a Russian Foreign Intelligence Service (SVR) actor active since at least 2008, publicly tracked as Cozy Bear and Midnight Blizzard. The group is known for stealthy, long-dwell cloud and supply-chain intrusions against government, think-tank, and technology targets, including the 2020 SolarWinds compromise.',
+   ttps:['T1078.004','T1195.002','T1071.001','T1548','T1550.001'],
+   sectorBars:[{label:'Government', pct:58},{label:'Technology', pct:31},{label:'Think Tanks', pct:11}],
+   timeline:[{date:'Jul 21, 2026', title:'Cloud tenant compromise identified', detail:'OAuth token theft used to bypass MFA on victim tenant.'},{date:'Jun 04, 2026', title:'Supply-chain reconnaissance observed', detail:'Targeting build pipelines of a government software vendor.'}],
+   iocs:[{type:'DOMAIN', value:'graph-api-auth.net'},{type:'IP', value:'146.70.124.33'}]},
+  {id:'a8', name:'OILRIG', mitreId:'G0049', malpediaSlug:'oilrig', aliases:['APT34','Helix Kitten','Crambus'], country:'Iran', sponsor:'MOIS', motivation:'Espionage', severity:'high', campaigns:1, techniques:14, confidence:'High',
+   description:'OilRig is an Iranian Ministry of Intelligence (MOIS) actor active since at least 2014, publicly tracked as APT34 and Helix Kitten. The group targets government, financial, and energy organizations across the Middle East using DNS tunneling malware and trusted-vendor spear-phishing.',
+   ttps:['T1071.004','T1566.001','T1053.005','T1105'],
+   sectorBars:[{label:'Government', pct:44},{label:'Financial Services', pct:33},{label:'Energy', pct:23}],
+   timeline:[{date:'Jul 15, 2026', title:'DNS tunneling C2 identified', detail:'New subdomain pattern matching prior OilRig tooling.'}],
+   iocs:[{type:'DOMAIN', value:'ns1-relay-svc.info'}]},
+  {id:'a9', name:'KIMSUKY', mitreId:'G0094', malpediaSlug:'kimsuky', aliases:['Black Banshee','Thallium','Emerald Sleet'], country:'North Korea', sponsor:'Reconnaissance General Bureau', motivation:'Espionage', severity:'medium', campaigns:1, techniques:12, confidence:'Medium',
+   description:'Kimsuky is a North Korean RGB-linked actor active since at least 2012, publicly tracked as Emerald Sleet and Thallium. The group runs credential-phishing and social-engineering operations against journalists, academics, and government researchers focused on Korean Peninsula policy.',
+   ttps:['T1566.002','T1598.003','T1114.002'],
+   sectorBars:[{label:'Government', pct:50},{label:'Academia', pct:35},{label:'Media & NGOs', pct:15}],
+   timeline:[{date:'Jul 09, 2026', title:'Spear-phish targeting researchers', detail:'Fake conference invitations delivering credential-harvesting links.'}],
+   iocs:[{type:'URL', value:'hxxps://secure-conf-invite.org/rsvp'}]},
+  {id:'a10', name:'TURLA', mitreId:'G0010', malpediaSlug:'turla', aliases:['Snake','Venomous Bear','Secret Blizzard'], country:'Russia', sponsor:'FSB Center 16', motivation:'Espionage', severity:'high', campaigns:1, techniques:15, confidence:'High',
+   description:'Turla is a Russian FSB-linked actor active since at least 1996, publicly tracked as Snake and Secret Blizzard, among the longest-running espionage clusters tracked in open source. The group is known for satellite-based C2 hijacking and compromising other threat actors\' infrastructure to piggyback on their access.',
+   ttps:['T1071.001','T1205','T1554','T1082'],
+   sectorBars:[{label:'Government', pct:47},{label:'Defense', pct:38},{label:'Media & NGOs', pct:15}],
+   timeline:[{date:'Jun 30, 2026', title:'Satellite C2 link identified', detail:'Hijacked downlink used for covert command traffic, consistent with prior Turla tradecraft.'}],
+   iocs:[{type:'IP', value:'77.238.240.19'}]},
+  {id:'a11', name:'MUSTANG PANDA', mitreId:'G0129', malpediaSlug:'mustang_panda', aliases:['Bronze President','Stately Taurus','Red Lich'], country:'China', sponsor:'Unattributed (assessed state-tasked)', motivation:'Espionage', severity:'medium', campaigns:1, techniques:13, confidence:'Medium',
+   description:'Mustang Panda is a China-based actor active since at least 2012, publicly tracked as Bronze President and Stately Taurus. The group targets government and NGO entities across Southeast Asia and Europe using USB-borne malware and sideloaded DLLs delivered through phishing lures referencing regional political events.',
+   ttps:['T1091','T1574.002','T1566.001'],
+   sectorBars:[{label:'Government', pct:41},{label:'Media & NGOs', pct:39},{label:'Telecom', pct:20}],
+   timeline:[{date:'Jun 21, 2026', title:'USB worm variant identified', detail:'New DLL sideloading chain observed dropping via removable media.'}],
+   iocs:[{type:'HASH', value:'d41d8cd98f00b204e9800998'}]},
+  {id:'a12', name:'SCATTERED SPIDER', mitreId:'G1015', malpediaSlug:'scattered_spider', aliases:['Muddled Libra','Octo Tempest','UNC3944'], country:'Unknown', sponsor:'Financially motivated (eCrime)', motivation:'Financial Gain', severity:'high', campaigns:1, techniques:16, confidence:'High',
+   description:'Scattered Spider is a financially motivated collective active since at least 2022, publicly tracked as Octo Tempest and UNC3944. The group specializes in help-desk social engineering and SIM-swapping to bypass MFA, gaining access to identity providers before deploying ransomware or extorting victims directly.',
+   ttps:['T1656','T1621','T1098','T1486'],
+   sectorBars:[{label:'Technology', pct:36},{label:'Retail', pct:34},{label:'Financial Services', pct:30}],
+   timeline:[{date:'Aug 01, 2026', title:'Help-desk vishing wave detected', detail:'Callers impersonating IT staff to reset MFA on privileged accounts.'}],
+   iocs:[{type:'DOMAIN', value:'okta-verify-support.com'}]}
+];
+
+const campaignsAll = [
+  {id:'c1', name:'Operation Frostline', actorId:'a1', sector:'Government', status:'active', firstSeen:'Mar 02, 2026', lastActivity:'3 days ago'},
+  {id:'c2', name:'Operation Cinderbolt', actorId:'a1', sector:'Defense', status:'active', firstSeen:'Jan 14, 2026', lastActivity:'2 weeks ago'},
+  {id:'c3', name:'Operation Greyveil', actorId:'a1', sector:'Media & NGOs', status:'dormant', firstSeen:'Nov 09, 2025', lastActivity:'41 days ago'},
+  {id:'c4', name:'Operation Ashwind', actorId:'a2', sector:'Energy', status:'active', firstSeen:'Feb 20, 2026', lastActivity:'6 days ago'},
+  {id:'c5', name:'Operation Palefire', actorId:'a2', sector:'Aviation', status:'dormant', firstSeen:'Dec 01, 2025', lastActivity:'1 month ago'},
+  {id:'c6', name:'Operation Longspindle', actorId:'a3', sector:'Telecom', status:'active', firstSeen:'Apr 18, 2026', lastActivity:'yesterday'},
+  {id:'c7', name:'Operation Ironloom', actorId:'a3', sector:'Manufacturing', status:'active', firstSeen:'Mar 22, 2026', lastActivity:'9 days ago'},
+  {id:'c8', name:'Operation Ledgerfall', actorId:'a4', sector:'Financial Services', status:'active', firstSeen:'May 05, 2026', lastActivity:'4 days ago'},
+  {id:'c9', name:'Operation Faintmark', actorId:'a5', sector:'Telecom', status:'dormant', firstSeen:'Jun 10, 2026', lastActivity:'23 days ago'},
+  {id:'c10', name:'Operation Stillwater', actorId:'a6', sector:'Utilities', status:'dormant', firstSeen:'Apr 02, 2026', lastActivity:'2 months ago'},
+  {id:'c11', name:'Operation Cloudveil', actorId:'a7', sector:'Technology', status:'active', firstSeen:'May 02, 2026', lastActivity:'5 days ago'},
+  {id:'c12', name:'Operation Duskwire', actorId:'a7', sector:'Government', status:'active', firstSeen:'Apr 18, 2026', lastActivity:'19 days ago'},
+  {id:'c13', name:'Operation Sandtunnel', actorId:'a8', sector:'Government', status:'active', firstSeen:'Jun 20, 2026', lastActivity:'11 days ago'},
+  {id:'c14', name:'Operation Inkwell', actorId:'a9', sector:'Academia', status:'active', firstSeen:'Jun 12, 2026', lastActivity:'17 days ago'},
+  {id:'c15', name:'Operation Serpentrelay', actorId:'a10', sector:'Defense', status:'dormant', firstSeen:'Mar 15, 2026', lastActivity:'28 days ago'},
+  {id:'c16', name:'Operation Bambooline', actorId:'a11', sector:'Media & NGOs', status:'dormant', firstSeen:'Feb 28, 2026', lastActivity:'34 days ago'},
+  {id:'c17', name:'Operation Sockpuppet', actorId:'a12', sector:'Technology', status:'active', firstSeen:'Jul 25, 2026', lastActivity:'2 days ago'}
+];
+const dashboardCampaignIds = ['c1','c6','c4','c8','c3'];
+
+const reportsList = [
+  {title:'APT28 — Actor Profile', type:'Actor Profile', related:'APT28', date:'Jul 30, 2026', format:'PDF'},
+  {title:'Operation Frostline — Campaign Brief', type:'Campaign Brief', related:'Operation Frostline', date:'Jul 29, 2026', format:'PDF'},
+  {title:'Energy Sector Exposure Assessment', type:'Sector Assessment', related:'Energy', date:'Jul 24, 2026', format:'DOCX'},
+  {title:'APT41 — Actor Profile', type:'Actor Profile', related:'APT41', date:'Jul 18, 2026', format:'PDF'},
+  {title:'Q3 ATT&CK Coverage Summary', type:'Coverage Report', related:'All Actors', date:'Jul 10, 2026', format:'PDF'},
+  {title:'Operation Ledgerfall — Campaign Brief', type:'Campaign Brief', related:'Operation Ledgerfall', date:'Jun 29, 2026', format:'DOCX'},
+  {title:'APT29 — Actor Profile', type:'Actor Profile', related:'APT29', date:'Jun 22, 2026', format:'PDF'},
+  {title:'Scattered Spider — IOC Feed Export', type:'IOC Feed', related:'SCATTERED SPIDER', date:'Jun 15, 2026', format:'CSV'}
+];
+
+const iocsGlobal = [
+  {type:'IP', value:'185.220.101.42', actor:'APT28', confidence:'High', source:'Internal Telemetry', firstSeen:'Jul 12, 2026', lastSeen:'Jul 30, 2026'},
+  {type:'DOMAIN', value:'cdn-assets-sync.org', actor:'APT41', confidence:'High', source:'OSINT Feed', firstSeen:'Jun 02, 2026', lastSeen:'Jul 29, 2026'},
+  {type:'HASH', value:'e3b0c44298fc1c149afb1234abcd', actor:'APT28', confidence:'Medium', source:'Sandbox Detonation', firstSeen:'Jun 18, 2026', lastSeen:'Jul 12, 2026'},
+  {type:'URL', value:'hxxps://npm-package-cdn.io/verify', actor:'LAZARUS GROUP', confidence:'High', source:'Partner Share', firstSeen:'Jul 20, 2026', lastSeen:'Jul 27, 2026'},
+  {type:'IP', value:'45.155.204.71', actor:'APT-C-23', confidence:'Low', source:'OSINT Feed', firstSeen:'Jul 08, 2026', lastSeen:'Jul 08, 2026'},
+  {type:'DOMAIN', value:'update-cdn-svc.net', actor:'APT28', confidence:'High', source:'Internal Telemetry', firstSeen:'Mar 04, 2026', lastSeen:'Jul 29, 2026'},
+  {type:'IP', value:'91.219.237.18', actor:'APT28', confidence:'Medium', source:'Partner Share', firstSeen:'May 11, 2026', lastSeen:'Jul 20, 2026'},
+  {type:'HASH', value:'a94a8fe5ccb19ba61c4c087a99a1', actor:'APT33', confidence:'High', source:'Sandbox Detonation', firstSeen:'May 28, 2026', lastSeen:'Jul 25, 2026'},
+  {type:'DOMAIN', value:'secure-billing-portal.com', actor:'APT33', confidence:'Medium', source:'OSINT Feed', firstSeen:'May 30, 2026', lastSeen:'Jul 06, 2026'},
+  {type:'IP', value:'103.224.182.9', actor:'APT41', confidence:'High', source:'Internal Telemetry', firstSeen:'Jun 30, 2026', lastSeen:'Jul 30, 2026'},
+  {type:'IP', value:'194.32.78.5', actor:'SANDWORM TEAM', confidence:'Low', source:'OSINT Feed', firstSeen:'May 14, 2026', lastSeen:'May 14, 2026'},
+  {type:'URL', value:'hxxps://secure-auth-verify.net/login', actor:'LAZARUS GROUP', confidence:'Medium', source:'Partner Share', firstSeen:'Jul 22, 2026', lastSeen:'Jul 27, 2026'}
+];
+
+const tacticsFull = [
+  {name:'Reconnaissance', techniques:[{id:'T1595', name:'Active Scanning'},{id:'T1589', name:'Gather Victim Identity Info'},{id:'T1590', name:'Gather Victim Network Info'}]},
+  {name:'Resource Development', techniques:[{id:'T1583', name:'Acquire Infrastructure'},{id:'T1585', name:'Establish Accounts'}]},
+  {name:'Initial Access', techniques:[{id:'T1566.001', name:'Phishing: Attachment'},{id:'T1566.002', name:'Phishing: Link'},{id:'T1195.002', name:'Supply Chain Compromise'},{id:'T1078', name:'Valid Accounts'},{id:'T1078.004', name:'Valid Accounts: Cloud'}]},
+  {name:'Execution', techniques:[{id:'T1059.001', name:'PowerShell'},{id:'T1204.002', name:'User Execution: File'},{id:'T1053', name:'Scheduled Task/Job'}]},
+  {name:'Persistence', techniques:[{id:'T1547.001', name:'Boot/Logon Autostart'},{id:'T1136', name:'Create Account'},{id:'T1505.003', name:'Server Software: Web Shell'}]},
+  {name:'Priv. Escalation', techniques:[{id:'T1055', name:'Process Injection'},{id:'T1068', name:'Exploit for Priv. Esc.'}]},
+  {name:'Stealth', techniques:[{id:'T1027', name:'Obfuscated Files'},{id:'T1027.002', name:'Software Packing'},{id:'T1070', name:'Indicator Removal'}]},
+  {name:'Defense Impairment', techniques:[{id:'T1562.001', name:'Disable or Modify Tools'},{id:'T1562.004', name:'Disable or Modify Firewall'}]},
+  {name:'Credential Access', techniques:[{id:'T1552.001', name:'Unsecured Credentials: Files'},{id:'T1110', name:'Brute Force'},{id:'T1003', name:'OS Credential Dumping'}]},
+  {name:'Discovery', techniques:[{id:'T1082', name:'System Info Discovery'},{id:'T1046', name:'Network Service Scanning'},{id:'T1087', name:'Account Discovery'}]},
+  {name:'Lateral Movement', techniques:[{id:'T1021.002', name:'Remote Services: SMB'},{id:'T1550.001', name:'Use Alternate Auth Material'}]},
+  {name:'Collection', techniques:[{id:'T1560', name:'Archive Collected Data'},{id:'T1114.002', name:'Email Collection: Remote'},{id:'T1005', name:'Data from Local System'}]},
+  {name:'Command and Control', techniques:[{id:'T1071.001', name:'App Layer Protocol: Web'},{id:'T1105', name:'Ingress Tool Transfer'},{id:'T1071.004', name:'App Layer Protocol: DNS'}]},
+  {name:'Exfiltration', techniques:[{id:'T1041', name:'Exfil Over C2 Channel'}]},
+  {name:'Impact', techniques:[{id:'T1486', name:'Data Encrypted for Impact'},{id:'T1490', name:'Inhibit System Recovery'}]}
+];
+
+const geoMarkersRaw = [
+  {label:'RU', top:'22%', left:'56%', sev:'critical'},
+  {label:'CN', top:'34%', left:'80%', sev:'critical'},
+  {label:'IR', top:'44%', left:'62%', sev:'high'},
+  {label:'KP', top:'32%', left:'86%', sev:'high'},
+  {label:'US', top:'40%', left:'16%', sev:'medium'},
+  {label:'BR', top:'68%', left:'26%', sev:'low'}
+];
+
+/* ---------------- State ---------------- */
+
+const state = {
+  view: 'dashboard',
+  selectedActorId: 'a1',
+  selectedCampaignId: 'c1',
+  attackFilterActorId: 'all',
+  iocTypeFilter: 'All',
+  actorSearch: '',
+  actorSeverityFilter: 'all'
+};
+let refocusSearch = false;
+
+/* ---------------- Derived logic ---------------- */
+
+const accent = ACCENT;
+const accentTint = tint(accent);
+const ttpBadgeStyle = `background:${accentTint};color:${accent};font-size:12px;font-weight:500;padding:6px 11px;border-radius:6px;font-family:var(--mono)`;
+
+function coverageActors(){ return actors.filter(a => a.id !== 'a6'); }
+function cellColor(level){ return ['#e5e7eb','#c7d2fe','#818cf8','#4338ca'][level] || '#e5e7eb'; }
+function techLevel(id, filterId){
+  if(filterId === 'all'){
+    const count = coverageActors().filter(a => a.ttps.includes(id)).length;
+    return count === 0 ? 0 : count === 1 ? 1 : count === 2 ? 2 : 3;
+  }
+  const a = actors.find(a => a.id === filterId);
+  return (a && a.ttps.includes(id)) ? 3 : 0;
+}
+function actorById(id){ return actors.find(a => a.id === id) || actors[0]; }
+function initialsOf(name){ return name.split(' ').map(w=>w[0]).join(''); }
+function sevAvatarStyle(sev){
+  return `width:52px;height:52px;border-radius:12px;background:${SEV[sev].bg};color:${SEV[sev].text};font-family:var(--display);font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:center;flex:none`;
+}
+function statusStyleFor(status){
+  return status==='active'
+    ? 'background:#f0fdf4;color:#15803d;font-size:11px;font-weight:600;text-transform:uppercase;padding:4px 9px;border-radius:5px'
+    : 'background:#f3f4f6;color:#6b7280;font-size:11px;font-weight:600;text-transform:uppercase;padding:4px 9px;border-radius:5px';
+}
+function confColor(conf){ return conf==='High'?'#15803d':conf==='Medium'?'#b45309':'#6b7280'; }
+
+/* ---------------- Actions ---------------- */
+
+function setState(patch){ Object.assign(state, patch); render(); }
+
+const actions = {
+  nav: (id) => setState({view:id}),
+  goToActor: (id) => setState({view:'detail', selectedActorId:id}),
+  goToCampaign: (id) => setState({view:'campaign', selectedCampaignId:id}),
+  goBack: () => setState({view:'dashboard'}),
+  setAttackFilter: (id) => setState({attackFilterActorId:id}),
+  setIocFilter: (t) => setState({iocTypeFilter:t}),
+  setActorSeverityFilter: (id) => setState({actorSeverityFilter:id})
+};
+
+/* ---------------- View fragments ---------------- */
+
+const CARD = 'background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 1px 2px rgba(16,24,40,0.04)';
+
+function navItem(icon, label, active, act, id){
+  const style = `display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:7px;font-size:13.5px;font-weight:500;`
+    + (active ? `background:${accentTint};color:${accent}` : 'color:#4b5563');
+  return `<div class="nav-item" style="${style}" data-act="${act}" ${id?`data-id="${id}"`:''} tabindex="0" role="button">${icon}<span>${label}</span></div>`;
+}
+
+function renderSidebar(){
+  const v = state.view;
+  const overviewActive = (v==='dashboard'||v==='detail'||v==='campaign');
+  return `
+  <div style="width:236px;flex:none;background:#ffffff;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;padding:20px 14px">
+    <div style="display:flex;align-items:center;gap:9px;padding:6px 8px 22px">
+      <div style="width:30px;height:30px;border-radius:7px;background:${accent};display:flex;align-items:center;justify-content:center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg>
+      </div>
+      <div style="font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:-0.2px">ARGUS<span style="color:${accent}">TI</span></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px">
+      ${navItem('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>','Overview',overviewActive,'nav','dashboard')}
+      ${navItem('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path></svg>','Threat Actors',v==='actors','nav','actors')}
+      ${navItem('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15l4-8 4 5 3-4 5 9"></path></svg>','Campaigns',v==='campaigns-list','nav','campaigns-list')}
+      ${navItem('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="6"></circle><path d="M20 20l-5.5-5.5"></path></svg>','IOC Search',v==='iocs','nav','iocs')}
+      ${navItem('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M3 15h18M9 3v18M15 3v18"></path></svg>','ATT&amp;CK Matrix',v==='attack','nav','attack')}
+      ${navItem('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.5 2.5 2.5 15.5 0 18M12 3c-2.5 2.5-2.5 15.5 0 18"></path></svg>','Geo Map',v==='geo','nav','geo')}
+      ${navItem('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l3 3v15H6z"></path><path d="M9 12h6M9 16h6"></path></svg>','Reports',v==='reports','nav','reports')}
+    </div>
+    <div style="margin-top:auto;padding:14px 10px;border-top:1px solid #f0f1f3;display:flex;flex-direction:column;gap:3px">
+      <div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em">Signed in as</div>
+      <div style="display:flex;align-items:center;gap:8px;padding-top:4px">
+        <div style="width:28px;height:28px;border-radius:50%;background:#eef2ff;color:#4338ca;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;font-family:var(--display)">MK</div>
+        <div style="font-size:13px;font-weight:500">M. Kovac</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function backCrumb(label, extra){
+  return `<div style="display:flex;align-items:center;gap:10px;cursor:pointer" data-act="nav" data-id="dashboard" tabindex="0" role="button">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      <span style="font-size:13px;color:#6b7280">${label}</span>${extra||''}
+    </div>`;
+}
+
+function renderTopbar(){
+  const v = state.view;
+  let crumb = '', title = '';
+  if(v==='dashboard'){ title='Overview'; }
+  else if(v==='detail'){
+    const a=actorById(state.selectedActorId);
+    crumb=`<div style="display:flex;align-items:center;gap:10px;cursor:pointer" data-act="nav" data-id="actors" tabindex="0" role="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        <span style="font-size:13px;color:#6b7280">Threat Actors</span>
+        <span style="font-size:13px;color:#d1d5db">/</span>
+        <span style="font-size:13px;color:#111827;font-weight:600">${esc(a.name)}</span></div>`;
+  }
+  else if(v==='campaign'){
+    const c=campaignsAll.find(x=>x.id===state.selectedCampaignId)||campaignsAll[0];
+    crumb=backCrumb('Overview',`<span style="font-size:13px;color:#d1d5db">/</span><span style="font-size:13px;color:#111827;font-weight:600">${esc(c.name)}</span>`);
+  }
+  else if(v==='actors'){ crumb=backCrumb('Overview'); title='Threat Actors'; }
+  else if(v==='iocs'){ crumb=backCrumb('Overview'); title='IOC Search'; }
+  else if(v==='attack'){ crumb=backCrumb('Overview'); title='ATT&amp;CK Coverage Matrix'; }
+  else if(v==='reports'){ crumb=backCrumb('Overview'); title='Reports'; }
+  else if(v==='campaigns-list'){ crumb=backCrumb('Overview'); title='Campaigns'; }
+  else if(v==='geo'){ crumb=backCrumb('Overview'); title='Geo Map'; }
+
+  const titleHtml = title ? `<div style="font-family:var(--display);font-weight:600;font-size:17px">${title}</div>` : '';
+  return `
+  <div style="height:64px;flex:none;border-bottom:1px solid #e5e7eb;background:#ffffff;display:flex;align-items:center;padding:0 28px;gap:20px">
+    ${crumb}
+    ${titleHtml}
+    <div style="flex:1;display:flex;justify-content:center;max-width:520px;margin:0 auto">
+      <div style="width:100%;display:flex;align-items:center;gap:8px;background:#f5f6f8;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <span style="font-size:13px;color:#9ca3af">Search actors, IOCs, CVEs, campaigns…</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.8"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+      <div style="width:30px;height:30px;border-radius:50%;background:#111827;color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;font-family:var(--display)">MK</div>
+    </div>
+  </div>`;
+}
+
+function renderDashboard(){
+  const kpis = [
+    {label:'Active Campaigns', value:'47', delta:'+6 this week', deltaColor:'#dc2626'},
+    {label:'Tracked Threat Actors', value:'182', delta:'+3 new', deltaColor:'#6b7280'},
+    {label:'Open IOCs', value:'3,214', delta:'+128 today', deltaColor:'#6b7280'},
+    {label:'ATT&CK Coverage', value:'68%', delta:'+2pts this month', deltaColor:'#15803d'}
+  ];
+  const kpiHtml = kpis.map(k=>`
+    <div style="${CARD};padding:18px 20px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:12.5px;color:#6b7280;font-weight:500">${k.label}</div>
+      <div style="font-family:var(--display);font-size:28px;font-weight:700;font-variant-numeric:tabular-nums">${k.value}</div>
+      <div style="font-size:12px;color:${k.deltaColor};font-weight:500">${k.delta}</div>
+    </div>`).join('');
+
+  const geoHtml = geoMarkersRaw.map(m=>`
+    <div style="position:absolute;top:${m.top};left:${m.left};display:flex;align-items:center;justify-content:center">
+      <div style="position:absolute;width:9px;height:9px;border-radius:50%;background:${SEV[m.sev].ring};animation:pulseRing 2.2s ease-out infinite"></div>
+      <div style="position:relative;width:9px;height:9px;border-radius:50%;background:${SEV[m.sev].dot};box-shadow:0 0 0 3px #fff"></div>
+      <div style="position:absolute;left:14px;font-size:10.5px;font-weight:600;color:#374151;white-space:nowrap">${m.label}</div>
+    </div>`).join('');
+  const legendHtml = ['critical','high','medium','low'].map(sev=>`
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#6b7280">
+      <div style="width:8px;height:8px;border-radius:50%;background:${SEV[sev].dot}"></div>${sev.charAt(0).toUpperCase()+sev.slice(1)}
+    </div>`).join('');
+
+  const topActorsHtml = actors.map(a=>`
+    <div class="row-hover" style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:7px;cursor:pointer" data-act="goToActor" data-id="${a.id}" tabindex="0" role="button">
+      <div style="${dotStyle(a.severity,9)}"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;font-family:var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.name)}</div>
+        <div style="font-size:11.5px;color:#9ca3af">${esc(a.country)} · ${esc(a.motivation)}</div>
+      </div>
+      <div style="font-size:11px;color:#9ca3af;white-space:nowrap">${a.campaigns} campaigns</div>
+    </div>`).join('');
+
+  const tactics = tacticsFull.slice(0,6).map(t=>({
+    name:t.name,
+    cells: t.techniques.slice(0,4).map(tech=>`<div style="height:26px;border-radius:4px;background:${cellColor(techLevel(tech.id,'all'))}" title="${esc(tech.name)}"></div>`).join('')
+  }));
+  const matrixHtml = tactics.map(t=>`
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="font-size:11px;font-weight:600;color:#374151;text-align:center;height:28px;display:flex;align-items:center;justify-content:center;line-height:1.15">${t.name}</div>
+      ${t.cells}
+    </div>`).join('');
+
+  const iocsHtml = iocsGlobal.map(i=>`
+    <div style="display:flex;flex-direction:column;gap:3px;padding-bottom:9px;border-bottom:1px solid #f3f4f6">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:11px;font-weight:600;color:${IOC_COLOR[i.type]||'#6b7280'}">${i.type}</span>
+        <span style="font-size:10.5px;font-weight:600;color:${confColor(i.confidence)}">${i.confidence}</span>
+      </div>
+      <div style="font-family:var(--mono);font-size:12px;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.value)}</div>
+      <div style="font-size:11px;color:#9ca3af">linked to ${esc(i.actor)}</div>
+    </div>`).join('');
+
+  const campHtml = dashboardCampaignIds.map(id=>{
+    const c=campaignsAll.find(x=>x.id===id); const a=actorById(c.actorId);
+    return `<div class="row-hover" style="display:grid;grid-template-columns:1.8fr 1.4fr 1.2fr 1fr 1fr;padding:13px 20px;border-top:1px solid #f3f4f6;align-items:center;font-size:13px;cursor:pointer" data-act="goToCampaign" data-id="${c.id}" tabindex="0" role="button">
+      <div style="font-weight:500">${esc(c.name)}</div>
+      <div style="color:${accent};font-weight:500">${esc(a.name)}</div>
+      <div style="color:#6b7280">${esc(c.sector)}</div>
+      <div><span style="${statusStyleFor(c.status)}">${c.status}</span></div>
+      <div style="color:#9ca3af">${esc(c.lastActivity)}</div>
+    </div>`;
+  }).join('');
+
+  return `<div>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-0.3px">Threat Landscape</div>
+        <div style="font-size:13px;color:#6b7280;margin-top:4px">Last updated 12 minutes ago · Global visibility</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px">${kpiHtml}</div>
+    <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:20px;align-items:stretch">
+      <div style="${CARD};padding:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div style="font-size:14px;font-weight:600">Global Activity</div>
+          <div style="font-size:12px;color:#9ca3af">Last 24 hours</div>
+        </div>
+        <div style="position:relative;height:260px;border-radius:8px;background:linear-gradient(#eef0f3 1px, transparent 1px) 0 0/100% 13%,linear-gradient(90deg,#eef0f3 1px, transparent 1px) 0 0/8.3% 100%,#fafbfc;border:1px solid #eef0f3;overflow:hidden">${geoHtml}</div>
+        <div style="display:flex;gap:18px;margin-top:14px">${legendHtml}</div>
+      </div>
+      <div style="${CARD};padding:20px;display:flex;flex-direction:column">
+        <div style="font-size:14px;font-weight:600;margin-bottom:14px">Top Threat Actors</div>
+        <div style="display:flex;flex-direction:column;gap:2px;flex:1">${topActorsHtml}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:20px;align-items:start">
+      <div style="${CARD};padding:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div style="font-size:14px;font-weight:600">MITRE ATT&CK Coverage</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:11.5px;color:#9ca3af">
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#e5e7eb;display:inline-block"></span>None</span>
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#c7d2fe;display:inline-block"></span>Low</span>
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#818cf8;display:inline-block"></span>Med</span>
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#4338ca;display:inline-block"></span>High</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">${matrixHtml}</div>
+      </div>
+      <div style="${CARD};padding:20px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:12px">IOC Search</div>
+        <div style="display:flex;align-items:center;gap:8px;background:#f5f6f8;border:1px solid #e5e7eb;border-radius:7px;padding:8px 10px;margin-bottom:14px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <span style="font-size:12.5px;color:#9ca3af;font-family:var(--mono)">185.220.101.x</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">${iocsHtml}</div>
+      </div>
+    </div>
+    <div style="${CARD};overflow:hidden">
+      <div style="font-size:14px;font-weight:600;padding:18px 20px 14px">Active Campaigns</div>
+      <div style="display:grid;grid-template-columns:1.8fr 1.4fr 1.2fr 1fr 1fr;padding:0 20px 10px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em">
+        <div>Campaign</div><div>Attributed Actor</div><div>Target Sector</div><div>Status</div><div>Last Activity</div>
+      </div>
+      ${campHtml}
+    </div>
+  </div>`;
+}
+
+function renderActors(){
+  const search = (state.actorSearch||'').toLowerCase();
+  const sevFilter = state.actorSeverityFilter||'all';
+  const filtered = actors.filter(a=>{
+    const ms = !search || a.name.toLowerCase().includes(search) || a.country.toLowerCase().includes(search) || (a.aliases||[]).some(al=>al.toLowerCase().includes(search));
+    const mv = sevFilter==='all' || a.severity===sevFilter;
+    return ms && mv;
+  });
+  const chips = [{id:'all',name:'All'},{id:'critical',name:'Critical'},{id:'high',name:'High'},{id:'medium',name:'Medium'},{id:'low',name:'Low'}].map(c=>{
+    const style = c.id===sevFilter
+      ? `padding:6px 13px;border-radius:16px;font-size:12.5px;font-weight:600;cursor:pointer;background:${accentTint};color:${accent};border:1px solid ${accent}`
+      : 'padding:6px 13px;border-radius:16px;font-size:12.5px;font-weight:500;cursor:pointer;background:#fff;color:#4b5563;border:1px solid #e5e7eb';
+    return `<div style="${style}" data-act="setActorSeverityFilter" data-id="${c.id}" tabindex="0" role="button">${c.name}</div>`;
+  }).join('');
+  const cards = filtered.map(a=>`
+    <div class="card-hover" style="${CARD};padding:18px;cursor:pointer;display:flex;gap:14px" data-act="goToActor" data-id="${a.id}" tabindex="0" role="button">
+      <div style="${sevAvatarStyle(a.severity)}">${initialsOf(a.name)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div style="font-size:14.5px;font-weight:600;font-family:var(--display)">${esc(a.name)}</div>
+          <span style="${badgeStyle(a.severity)}">${a.severity}</span>
+        </div>
+        <div style="font-size:12px;color:#9ca3af;margin:4px 0 10px">${esc(a.country)} · ${esc(a.sponsor)} · ${esc(a.motivation)}</div>
+        <div style="display:flex;gap:16px;font-size:11.5px;color:#6b7280">
+          <span>${a.campaigns} campaigns</span>
+          <span>${a.iocs.length} IOCs</span>
+          <span>${a.techniques} techniques</span>
+        </div>
+      </div>
+    </div>`).join('') || `<div style="grid-column:1/-1;padding:48px 20px;text-align:center;color:#9ca3af;${CARD}"><div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:4px">No actors match this filter</div><div style="font-size:13px">Try a different search term or severity.</div></div>`;
+
+  return `<div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:9px 14px;flex:1;max-width:340px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+        <input id="actorSearch" value="${esc(state.actorSearch||'')}" placeholder="Search by name, alias, or country…" style="border:none;outline:none;font-size:13px;flex:1;color:#111827;background:transparent"/>
+      </div>
+      <div style="font-size:13px;color:#6b7280;white-space:nowrap">${filtered.length} of ${actors.length} actors</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">${chips}</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px">${cards}</div>
+  </div>`;
+}
+
+function campaignRow(c){
+  const a=actorById(c.actorId);
+  return `<div class="row-hover" style="display:grid;grid-template-columns:1.8fr 1.4fr 1.2fr 1fr 1fr;padding:13px 20px;border-top:1px solid #f3f4f6;align-items:center;font-size:13px;cursor:pointer" data-act="goToCampaign" data-id="${c.id}" tabindex="0" role="button">
+      <div style="font-weight:500">${esc(c.name)}</div>
+      <div style="color:${accent};font-weight:500">${esc(a.name)}</div>
+      <div style="color:#6b7280">${esc(c.sector)}</div>
+      <div><span style="${statusStyleFor(c.status)}">${c.status}</span></div>
+      <div style="color:#9ca3af">${esc(c.lastActivity)}</div>
+    </div>`;
+}
+
+function renderCampaignsList(){
+  return `<div>
+    <div style="margin-bottom:16px"><div style="font-size:13px;color:#6b7280">${campaignsAll.length} tracked campaigns</div></div>
+    <div style="${CARD};overflow:hidden">
+      <div style="display:grid;grid-template-columns:1.8fr 1.4fr 1.2fr 1fr 1fr;padding:14px 20px 10px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em">
+        <div>Campaign</div><div>Attributed Actor</div><div>Target Sector</div><div>Status</div><div>Last Activity</div>
+      </div>
+      ${campaignsAll.map(campaignRow).join('')}
+    </div>
+  </div>`;
+}
+
+function renderGeo(){
+  const geoHtml = geoMarkersRaw.map(m=>`
+    <div style="position:absolute;top:${m.top};left:${m.left};display:flex;align-items:center;justify-content:center">
+      <div style="position:absolute;width:9px;height:9px;border-radius:50%;background:${SEV[m.sev].ring};animation:pulseRing 2.2s ease-out infinite"></div>
+      <div style="position:relative;width:9px;height:9px;border-radius:50%;background:${SEV[m.sev].dot};box-shadow:0 0 0 3px #fff"></div>
+      <div style="position:absolute;left:14px;font-size:10.5px;font-weight:600;color:#374151;white-space:nowrap">${m.label}</div>
+    </div>`).join('');
+  const legendHtml = ['critical','high','medium','low'].map(sev=>`
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#6b7280">
+      <div style="width:8px;height:8px;border-radius:50%;background:${SEV[sev].dot}"></div>${sev.charAt(0).toUpperCase()+sev.slice(1)}
+    </div>`).join('');
+  const counts = {};
+  actors.forEach(a=>{ counts[a.country]=(counts[a.country]||0)+1; });
+  const breakdown = Object.keys(counts).sort((x,y)=>counts[y]-counts[x]).map(country=>{
+    const rep=actors.find(a=>a.country===country); const count=counts[country];
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 20px;border-top:1px solid #f3f4f6;font-size:13px">
+      <div style="display:flex;align-items:center;gap:8px"><div style="width:9px;height:9px;border-radius:50%;background:${SEV[rep.severity].dot}"></div>${esc(country)}</div>
+      <div style="color:#6b7280">${count} actor${count===1?'':'s'}</div>
+    </div>`;
+  }).join('');
+  return `<div>
+    <div style="${CARD};padding:20px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="font-size:14px;font-weight:600">Global Activity</div>
+        <div style="font-size:12px;color:#9ca3af">Last 24 hours</div>
+      </div>
+      <div style="position:relative;height:480px;border-radius:8px;background:linear-gradient(#eef0f3 1px, transparent 1px) 0 0/100% 8%,linear-gradient(90deg,#eef0f3 1px, transparent 1px) 0 0/5% 100%,#fafbfc;border:1px solid #eef0f3;overflow:hidden">${geoHtml}</div>
+      <div style="display:flex;gap:18px;margin-top:14px">${legendHtml}</div>
+    </div>
+    <div style="${CARD};overflow:hidden">
+      <div style="font-size:14px;font-weight:600;padding:18px 20px 12px">Actors by Country</div>
+      ${breakdown}
+    </div>
+  </div>`;
+}
+
+function renderDetail(){
+  const a = actorById(state.selectedActorId);
+  const stats = [
+    {label:'Active Campaigns', value:String(a.campaigns)},
+    {label:'Associated IOCs', value:String(a.iocs.length)},
+    {label:'ATT&CK Techniques', value:String(a.techniques)},
+    {label:'Attribution Confidence', value:a.confidence}
+  ];
+  const statHtml = stats.map(s=>`
+    <div style="${CARD};padding:16px 18px">
+      <div style="font-size:12px;color:#6b7280;margin-bottom:6px">${s.label}</div>
+      <div style="font-family:var(--display);font-size:22px;font-weight:700">${s.value}</div>
+    </div>`).join('');
+
+  const aliasesHtml = (a.aliases||[]).map(al=>`<span style="background:#f3f4f6;color:#4b5563;font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:5px;font-family:var(--mono)">${esc(al)}</span>`).join('');
+  const ttpsHtml = a.ttps.map(t=>`<span style="${ttpBadgeStyle}">${t}</span>`).join('');
+
+  const relCamps = campaignsAll.filter(c=>c.actorId===a.id).map(rc=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-top:1px solid #f3f4f6">
+      <div>
+        <div style="font-size:13px;font-weight:500">${esc(rc.name)}</div>
+        <div style="font-size:11.5px;color:#9ca3af;margin-top:2px">${esc(rc.sector)} · ${esc(rc.lastActivity)}</div>
+      </div>
+      <span style="${statusStyleFor(rc.status)}">${rc.status}</span>
+    </div>`).join('');
+
+  const timelineHtml = a.timeline.map((ev,i)=>`
+    <div style="display:flex;gap:14px">
+      <div style="display:flex;flex-direction:column;align-items:center;flex:none">
+        <div style="width:9px;height:9px;border-radius:50%;background:${accent};flex:none;margin-top:4px"></div>
+        <div style="${i<a.timeline.length-1?'width:1px;flex:1;background:#e5e7eb;margin-top:4px':''}"></div>
+      </div>
+      <div style="padding-bottom:20px">
+        <div style="font-size:11.5px;color:#9ca3af;margin-bottom:2px">${esc(ev.date)}</div>
+        <div style="font-size:13px;font-weight:500;color:#111827">${esc(ev.title)}</div>
+        <div style="font-size:12.5px;color:#6b7280;margin-top:2px">${esc(ev.detail)}</div>
+      </div>
+    </div>`).join('');
+
+  const sectorHtml = a.sectorBars.map(sb=>`
+    <div>
+      <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px"><span>${esc(sb.label)}</span><span style="color:#9ca3af">${sb.pct}%</span></div>
+      <div style="height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden"><div style="height:100%;background:#4338ca;border-radius:3px;width:${sb.pct}%"></div></div>
+    </div>`).join('');
+
+  const iocHtml = a.iocs.map(i=>`
+    <div style="display:flex;flex-direction:column;gap:3px;padding-bottom:9px;border-bottom:1px solid #f3f4f6">
+      <span style="font-size:11px;font-weight:600;color:${IOC_COLOR[i.type]||'#6b7280'}">${i.type}</span>
+      <div style="font-family:var(--mono);font-size:12px;color:#111827;overflow:hidden;text-overflow:ellipsis">${esc(i.value)}</div>
+    </div>`).join('');
+
+  const related = actors.filter(x=>x.id!==a.id).slice(0,3).map(ra=>`
+    <div style="display:flex;align-items:center;gap:9px;cursor:pointer" data-act="goToActor" data-id="${ra.id}" tabindex="0" role="button">
+      <div style="${dotStyle(ra.severity,9)}"></div>
+      <span style="font-size:13px;font-weight:500">${esc(ra.name)}</span>
+    </div>`).join('');
+
+  const mitreRef = a.mitreId ? `
+    <a href="https://attack.mitre.org/groups/${a.mitreId}/" target="_blank" rel="noopener" style="font-size:12.5px;display:flex;align-items:center;gap:7px">
+      <span style="background:#f3f4f6;color:#4b5563;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:4px">MITRE</span>
+      ${a.mitreId} — ATT&amp;CK Group Page
+    </a>` : '';
+
+  return `<div>
+    <div style="${CARD};border-radius:12px;padding:24px 26px;margin-bottom:18px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">
+        <div style="display:flex;gap:16px">
+          <div style="${sevAvatarStyle(a.severity)}">${initialsOf(a.name)}</div>
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+              <div style="font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-0.3px">${esc(a.name)}</div>
+              <span style="${badgeStyle(a.severity)}">${a.severity}</span>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${aliasesHtml}</div>
+            <div style="font-size:13px;color:#6b7280;display:flex;gap:16px;flex-wrap:wrap">
+              <span><b style="color:#374151">Origin:</b> ${esc(a.country)}</span>
+              <span><b style="color:#374151">Sponsor:</b> ${esc(a.sponsor)}</span>
+              <span><b style="color:#374151">Motivation:</b> ${esc(a.motivation)}</span>
+              <span><b style="color:#374151">Confidence:</b> ${esc(a.confidence)}</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex:none">
+          <div style="border:1px solid #e5e7eb;color:#374151;font-size:12.5px;font-weight:500;padding:8px 14px;border-radius:7px;cursor:pointer">Export Report</div>
+          <div style="background:${accent};color:#fff;font-size:12.5px;font-weight:500;padding:8px 14px;border-radius:7px;cursor:pointer">+ Add to Watchlist</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px">${statHtml}</div>
+    <div style="display:grid;grid-template-columns:1.65fr 1fr;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div style="${CARD};padding:20px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:10px">Overview</div>
+          <div style="font-size:13.5px;line-height:1.65;color:#374151">${esc(a.description)}</div>
+        </div>
+        <div style="${CARD};padding:20px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px">ATT&CK Techniques Observed</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">${ttpsHtml}</div>
+        </div>
+        <div style="${CARD};overflow:hidden">
+          <div style="font-size:14px;font-weight:600;padding:18px 20px 12px">Associated Campaigns</div>
+          ${relCamps}
+        </div>
+        <div style="${CARD};padding:20px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:16px">Activity Timeline</div>
+          <div style="display:flex;flex-direction:column;gap:0">${timelineHtml}</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div style="${CARD};padding:20px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px">Targeted Sectors</div>
+          <div style="display:flex;flex-direction:column;gap:10px">${sectorHtml}</div>
+        </div>
+        <div style="${CARD};padding:20px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px">Indicators of Compromise</div>
+          <div style="display:flex;flex-direction:column;gap:10px">${iocHtml}</div>
+        </div>
+        <div style="${CARD};padding:20px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px">Related Actors</div>
+          <div style="display:flex;flex-direction:column;gap:8px">${related}</div>
+        </div>
+        <div style="${CARD};padding:20px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px">External References</div>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            ${mitreRef}
+            <a href="https://malpedia.caad.fkie.fraunhofer.de/actor/${a.malpediaSlug}" target="_blank" rel="noopener" style="font-size:12.5px;display:flex;align-items:center;gap:7px">
+              <span style="background:#f3f4f6;color:#4b5563;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:4px">Malpedia</span>
+              Actor Profile
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderIocs(){
+  const chipOpts = ['All','IP','DOMAIN','HASH','URL'];
+  const chips = chipOpts.map(t=>{
+    const style = t===state.iocTypeFilter
+      ? `background:${accent};color:#fff;font-size:12px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer;flex:none`
+      : 'background:#f3f4f6;color:#4b5563;font-size:12px;font-weight:500;padding:7px 14px;border-radius:7px;cursor:pointer;flex:none';
+    return `<div style="${style}" data-act="setIocFilter" data-id="${t}" tabindex="0" role="button">${t}</div>`;
+  }).join('');
+  const rows = iocsGlobal.filter(i=>state.iocTypeFilter==='All'||i.type===state.iocTypeFilter);
+  const bodyHtml = rows.length ? rows.map(i=>`
+    <div style="display:grid;grid-template-columns:0.7fr 2fr 1fr 1.3fr 1.2fr 1fr 1fr;gap:12px;padding:13px 20px;border-top:1px solid #f3f4f6;align-items:center;font-size:13px">
+      <div style="font-size:11px;font-weight:600;color:${IOC_COLOR[i.type]||'#6b7280'}">${i.type}</div>
+      <div style="font-family:var(--mono);font-size:12.5px;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.value)}</div>
+      <div style="font-size:11px;font-weight:600;color:${confColor(i.confidence)}">${i.confidence}</div>
+      <div style="color:${accent};font-weight:500">${esc(i.actor)}</div>
+      <div style="color:#6b7280;font-size:12.5px">${esc(i.source)}</div>
+      <div style="color:#9ca3af;font-size:12px">${esc(i.firstSeen)}</div>
+      <div style="color:#9ca3af;font-size:12px">${esc(i.lastSeen)}</div>
+    </div>`).join('') : `
+    <div style="padding:56px 20px;text-align:center;color:#9ca3af">
+      <div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:4px">No indicators match this filter</div>
+      <div style="font-size:13px">Try a different indicator type or clear the search.</div>
+    </div>`;
+
+  return `<div>
+    <div style="margin-bottom:20px">
+      <div style="font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-0.3px">Indicator Search</div>
+      <div style="font-size:13px;color:#6b7280;margin-top:4px">3,214 indicators tracked across all sources</div>
+    </div>
+    <div style="${CARD};padding:20px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;background:#f5f6f8;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;margin-bottom:16px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+        <span style="font-size:13px;color:#9ca3af;font-family:var(--mono)">Search by IP, domain, hash, or URL…</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${chips}</div>
+    </div>
+    <div style="${CARD};overflow:hidden">
+      <div style="overflow-x:auto">
+        <div style="min-width:820px">
+          <div style="display:grid;grid-template-columns:0.7fr 2fr 1fr 1.3fr 1.2fr 1fr 1fr;gap:12px;padding:14px 20px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid #f3f4f6">
+            <div>Type</div><div>Indicator</div><div>Confidence</div><div>Associated Actor</div><div>Source</div><div>First Seen</div><div>Last Seen</div>
+          </div>
+          ${bodyHtml}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderAttack(){
+  const filterId = state.attackFilterActorId;
+  const all = tacticsFull.flatMap(t=>t.techniques);
+  const covered = all.filter(tech=>techLevel(tech.id,'all')>0).length;
+  const pct = Math.round((covered/all.length)*100);
+  const chips = [{id:'all',name:'All Actors'}, ...coverageActors().map(a=>({id:a.id,name:a.name}))].map(c=>{
+    const style = c.id===filterId
+      ? `background:${accent};color:#fff;font-size:12px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer;flex:none`
+      : 'background:#f3f4f6;color:#4b5563;font-size:12px;font-weight:500;padding:7px 14px;border-radius:7px;cursor:pointer;flex:none';
+    return `<div style="${style}" data-act="setAttackFilter" data-id="${c.id}" tabindex="0" role="button">${esc(c.name)}</div>`;
+  }).join('');
+  const cols = tacticsFull.map(t=>{
+    const cells = t.techniques.map(tech=>{
+      const lvl = techLevel(tech.id, filterId);
+      return `<div style="background:${cellColor(lvl)};border-radius:6px;padding:8px 9px;display:flex;flex-direction:column;gap:2px;${lvl>=2?'color:#fff':'color:#374151'}">
+        <div style="font-family:var(--mono);font-size:10px;font-weight:600;opacity:0.85">${tech.id}</div>
+        <div style="font-size:11.5px;font-weight:500;line-height:1.25">${esc(tech.name)}</div>
+      </div>`;
+    }).join('');
+    return `<div style="flex:none;width:160px;display:flex;flex-direction:column;gap:6px">
+      <div style="font-size:12px;font-weight:600;color:#374151;padding:8px 4px;text-align:center;background:#fff;border:1px solid #e5e7eb;border-radius:6px">${t.name}</div>
+      ${cells}
+    </div>`;
+  }).join('');
+  return `<div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;gap:20px;flex-wrap:wrap">
+      <div>
+        <div style="font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-0.3px">ATT&amp;CK Coverage Matrix</div>
+        <div style="font-size:13px;color:#6b7280;margin-top:4px">${covered} of ${all.length} techniques observed (${pct}% coverage)</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:11.5px;color:#9ca3af">
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#e5e7eb;display:inline-block"></span>None</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#c7d2fe;display:inline-block"></span>Low</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#818cf8;display:inline-block"></span>Med</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:#4338ca;display:inline-block"></span>High</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">${chips}</div>
+    <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px">${cols}</div>
+  </div>`;
+}
+
+function renderCampaign(){
+  const c = campaignsAll.find(x=>x.id===state.selectedCampaignId)||campaignsAll[0];
+  const a = actorById(c.actorId);
+  const linkedIocs = iocsGlobal.filter(i=>i.actor===a.name).slice(0,4);
+  const statusBadge = c.status==='active'
+    ? 'background:#f0fdf4;color:#15803d;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;padding:4px 10px;border-radius:5px'
+    : 'background:#f3f4f6;color:#6b7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;padding:4px 10px;border-radius:5px';
+  const overview = `${c.name} is ${c.status==='active'?'an active':'a dormant'} campaign attributed to ${a.name}, targeting the ${c.sector} sector. First observed ${c.firstSeen}, with activity most recently logged ${c.lastActivity}.`;
+  const ttpsHtml = a.ttps.slice(0,6).map(t=>`<span style="${ttpBadgeStyle}">${t}</span>`).join('');
+  const timelineHtml = a.timeline.slice(0,3).map((ev,i)=>`
+    <div style="display:flex;gap:14px">
+      <div style="display:flex;flex-direction:column;align-items:center;flex:none">
+        <div style="width:9px;height:9px;border-radius:50%;background:${accent};flex:none;margin-top:4px"></div>
+        <div style="${i<2?'width:1px;flex:1;background:#e5e7eb;margin-top:4px':''}"></div>
+      </div>
+      <div style="padding-bottom:20px">
+        <div style="font-size:11.5px;color:#9ca3af;margin-bottom:2px">${esc(ev.date)}</div>
+        <div style="font-size:13px;font-weight:500;color:#111827">${esc(ev.title)}</div>
+        <div style="font-size:12.5px;color:#6b7280;margin-top:2px">${esc(ev.detail)}</div>
+      </div>
+    </div>`).join('');
+  const iocHtml = linkedIocs.map(i=>`
+    <div style="display:flex;flex-direction:column;gap:3px;padding-bottom:9px;border-bottom:1px solid #f3f4f6">
+      <span style="font-size:11px;font-weight:600;color:${IOC_COLOR[i.type]||'#6b7280'}">${i.type}</span>
+      <div style="font-family:var(--mono);font-size:12px;color:#111827;overflow:hidden;text-overflow:ellipsis">${esc(i.value)}</div>
+    </div>`).join('');
+  return `<div>
+    <div style="${CARD};border-radius:12px;padding:24px 26px;margin-bottom:18px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <div style="font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-0.3px">${esc(c.name)}</div>
+            <span style="${statusBadge}">${c.status}</span>
+          </div>
+          <div style="font-size:13px;color:#6b7280;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+            <span style="display:flex;align-items:center;gap:6px;cursor:pointer" data-act="goToActor" data-id="${a.id}" tabindex="0" role="button">
+              <span style="${dotStyle(a.severity,9)}"></span>
+              <b style="color:#374151">Attributed to:</b> ${esc(a.name)}
+            </span>
+            <span><b style="color:#374151">Sector:</b> ${esc(c.sector)}</span>
+            <span><b style="color:#374151">First Seen:</b> ${esc(c.firstSeen)}</span>
+            <span><b style="color:#374151">Confidence:</b> ${esc(a.confidence)}</span>
+          </div>
+        </div>
+        <div style="border:1px solid #e5e7eb;color:#374151;font-size:12.5px;font-weight:500;padding:8px 14px;border-radius:7px;cursor:pointer;flex:none">Export Report</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.65fr 1fr;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div style="${CARD};padding:20px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:10px">Overview</div>
+          <div style="font-size:13.5px;line-height:1.65;color:#374151">${esc(overview)}</div>
+        </div>
+        <div style="${CARD};padding:20px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px">ATT&amp;CK Techniques Observed</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">${ttpsHtml}</div>
+        </div>
+        <div style="${CARD};padding:20px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:16px">Recent Activity</div>
+          <div style="display:flex;flex-direction:column;gap:0">${timelineHtml}</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div style="${CARD};padding:16px 18px">
+          <div style="font-size:12px;color:#6b7280;margin-bottom:6px">Linked IOCs</div>
+          <div style="font-family:var(--display);font-size:22px;font-weight:700">${linkedIocs.length}</div>
+        </div>
+        <div style="${CARD};padding:20px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px">Indicators of Compromise</div>
+          <div style="display:flex;flex-direction:column;gap:10px">${iocHtml}</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderReports(){
+  const rows = reportsList.map(r=>`
+    <div style="display:grid;grid-template-columns:2.2fr 1.2fr 1.4fr 1fr 0.8fr;padding:13px 20px;border-top:1px solid #f3f4f6;align-items:center;font-size:13px">
+      <div style="font-weight:500">${esc(r.title)}</div>
+      <div style="color:#6b7280">${esc(r.type)}</div>
+      <div style="color:#6b7280">${esc(r.related)}</div>
+      <div style="color:#9ca3af;font-size:12px">${esc(r.date)}</div>
+      <div><span style="font-size:11px;font-weight:600;color:${accent};background:${accentTint};padding:3px 9px;border-radius:5px">${r.format}</span></div>
+    </div>`).join('');
+  return `<div>
+    <div style="margin-bottom:20px">
+      <div style="font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-0.3px">Reports</div>
+      <div style="font-size:13px;color:#6b7280;margin-top:4px">Generated actor profiles, campaign briefs, and coverage summaries</div>
+    </div>
+    <div style="${CARD};overflow:hidden">
+      <div style="overflow-x:auto"><div style="min-width:720px">
+        <div style="display:grid;grid-template-columns:2.2fr 1.2fr 1.4fr 1fr 0.8fr;padding:14px 20px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid #f3f4f6">
+          <div>Report</div><div>Type</div><div>Related To</div><div>Generated</div><div>Format</div>
+        </div>
+        ${rows}
+      </div></div>
+    </div>
+  </div>`;
+}
+
+function renderContent(){
+  switch(state.view){
+    case 'dashboard': return renderDashboard();
+    case 'actors': return renderActors();
+    case 'campaigns-list': return renderCampaignsList();
+    case 'geo': return renderGeo();
+    case 'detail': return renderDetail();
+    case 'iocs': return renderIocs();
+    case 'attack': return renderAttack();
+    case 'campaign': return renderCampaign();
+    case 'reports': return renderReports();
+    default: return renderDashboard();
+  }
+}
+
+/* ---------------- Mount / render ---------------- */
+
+function render(){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+  <div style="display:flex;height:100vh;width:100%;overflow:hidden">
+    ${renderSidebar()}
+    <div style="flex:1;display:flex;flex-direction:column;min-width:0;height:100%">
+      ${renderTopbar()}
+      <div id="content" style="flex:1;overflow:auto;padding:28px 32px 48px">${renderContent()}</div>
+    </div>
+  </div>`;
+
+  if(refocusSearch){
+    const inp = document.getElementById('actorSearch');
+    if(inp){ inp.focus(); const v=inp.value; inp.setSelectionRange(v.length, v.length); }
+    refocusSearch = false;
+  }
+}
+
+const app = document.getElementById('app');
+
+app.addEventListener('click', (e)=>{
+  const el = e.target.closest('[data-act]');
+  if(!el) return;
+  const act = el.getAttribute('data-act');
+  const id = el.getAttribute('data-id');
+  const fn = actions[act];
+  if(fn) fn(id);
+});
+
+app.addEventListener('keydown', (e)=>{
+  if(e.key!=='Enter' && e.key!==' ') return;
+  const el = e.target.closest('[data-act]');
+  if(!el || el.tagName==='INPUT') return;
+  e.preventDefault();
+  const fn = actions[el.getAttribute('data-act')];
+  if(fn) fn(el.getAttribute('data-id'));
+});
+
+app.addEventListener('input', (e)=>{
+  if(e.target && e.target.id==='actorSearch'){
+    state.actorSearch = e.target.value;
+    refocusSearch = true;
+    render();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
