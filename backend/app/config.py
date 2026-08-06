@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     )
     malpedia_base_url: str = "https://malpedia.caad.fkie.fraunhofer.de"
     malpedia_api_token: str | None = None
+    threatfox_api_url: str = "https://threatfox-api.abuse.ch/api/v1/"
+    abusech_auth_key: str | None = None
+    threatfox_days: int = 7
     stix_feed_url: str | None = None
     ingestion_interval_seconds: int = 3600
     request_timeout_seconds: float = 120.0

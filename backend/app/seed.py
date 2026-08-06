@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .models import Actor, ActorAlias, ActorEvent, Campaign, Indicator, Report, Source, Technique
+from .models import Actor, ActorAlias, ActorEvent, Campaign, Indicator, IndicatorSource, Report, Source, Technique
 
 
 ACTORS = [
@@ -141,18 +141,29 @@ def seed_database(session: Session) -> bool:
 
     observed = datetime(2026, 7, 30, tzinfo=timezone.utc)
     for number, (indicator_type, value, actor_id, confidence, source_name) in enumerate(INDICATORS, start=1):
-        session.add(
-            Indicator(
-                type=indicator_type,
-                value=value,
-                external_id=f"demo:ioc:{number}",
-                actor_id=actor_id,
+        external_id = f"demo:ioc:{number}"
+        indicator = Indicator(
+            type=indicator_type,
+            value=value,
+            external_id=external_id,
+            actor_id=actor_id,
+            source=sources[source_name],
+            confidence=confidence,
+            tags=[],
+            first_seen=observed,
+            last_seen=observed,
+        )
+        indicator.source_profiles.append(
+            IndicatorSource(
                 source=sources[source_name],
-                confidence=confidence,
+                external_id=external_id,
                 first_seen=observed,
                 last_seen=observed,
+                last_synced_at=observed,
+                is_active=True,
             )
         )
+        session.add(indicator)
 
     for title, report_type, related, published, report_format in REPORTS:
         session.add(

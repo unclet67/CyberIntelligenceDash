@@ -30,18 +30,12 @@ docker compose up --build
 
 The API is available at `http://127.0.0.1:8001`.
 
-## MITRE and Malpedia sync
+## Feed synchronization
 
-Run both source adapters once:
+Run the actor adapters independently or together:
 
 ```bash
 cd backend
-python -m app.worker --once --source all
-```
-
-Run a single adapter:
-
-```bash
 python -m app.worker --once --source mitre
 python -m app.worker --once --source malpedia
 ```
@@ -59,18 +53,40 @@ Malpedia actor endpoints do not require registration. If a token is provided,
 the backend sends `Authorization: apitoken <token>` as documented by Malpedia.
 Never put this token in `index.html` or another browser-delivered file.
 
-The identity merge order is:
+The actor identity merge order is source external ID, MITRE group ID, then
+case-insensitive name or alias. Each actor can retain multiple source profiles.
 
-1. Existing source external ID
-2. MITRE ATT&CK group ID
-3. Case-insensitive canonical name or alias
-4. New actor profile
+### ThreatFox IOC feed
 
-Each actor may have multiple `actor_sources` records. These retain the source
-name, external ID, public profile URL, and last successful sync time. MITRE
-contributes descriptions and ATT&CK technique relationships; Malpedia enriches
-aliases, country/sponsor metadata when existing fields are unknown, and its
-actor profile link. Empty source fields never erase populated actor fields.
+Obtain a free Auth-Key from <https://auth.abuse.ch/> and configure:
+
+```dotenv
+THREATFOX_API_URL=https://threatfox-api.abuse.ch/api/v1/
+ABUSECH_AUTH_KEY=your-auth-key
+THREATFOX_DAYS=7
+```
+
+Then run:
+
+```bash
+alembic upgrade head
+python -m app.worker --once --source threatfox
+```
+
+The adapter requests recent IOCs, maps IP/port, domain, URL, and hash types,
+and upserts by type and value. It preserves per-source IDs, confidence score,
+malware name, threat type, tags, reference, first/last-seen times, last-sync
+time, and a six-month expiration date. API responses exclude inactive or
+expired indicators unless `include_inactive=true` is requested.
+
+Run every configured feed with:
+
+```bash
+python -m app.worker --once --source all
+```
+
+If `ABUSECH_AUTH_KEY` is absent, an `all` run logs a warning and continues with
+MITRE and Malpedia. An explicit `--source threatfox` run fails clearly instead.
 
 To run scheduled syncs in Docker:
 

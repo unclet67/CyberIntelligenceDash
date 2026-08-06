@@ -35,6 +35,9 @@ services:
       MITRE_STIX_URL: ${MITRE_STIX_URL:-https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json}
       MALPEDIA_BASE_URL: ${MALPEDIA_BASE_URL:-https://malpedia.caad.fkie.fraunhofer.de}
       MALPEDIA_API_TOKEN: ${MALPEDIA_API_TOKEN:-}
+      THREATFOX_API_URL: ${THREATFOX_API_URL:-https://threatfox-api.abuse.ch/api/v1/}
+      ABUSECH_AUTH_KEY: ${ABUSECH_AUTH_KEY:-}
+      THREATFOX_DAYS: ${THREATFOX_DAYS:-7}
       INGESTION_INTERVAL_SECONDS: ${INGESTION_INTERVAL_SECONDS:-3600}
     depends_on:
       api:

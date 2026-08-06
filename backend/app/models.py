@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Column, Date, DateTime, ForeignKey, String, Table, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, JSON, String, Table, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -96,6 +96,9 @@ class Source(Base):
     actor_profiles: Mapped[list["ActorSource"]] = relationship(
         back_populates="source", cascade="all, delete-orphan"
     )
+    indicator_profiles: Mapped[list["IndicatorSource"]] = relationship(
+        back_populates="source", cascade="all, delete-orphan"
+    )
 
 
 class ActorSource(Base):
@@ -131,10 +134,48 @@ class Indicator(Base):
     actor_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id", ondelete="SET NULL"), index=True)
     source_id: Mapped[int | None] = mapped_column(ForeignKey("sources.id", ondelete="SET NULL"))
     confidence: Mapped[str] = mapped_column(String(20), nullable=False)
+    confidence_score: Mapped[int | None] = mapped_column(Integer)
+    threat_type: Mapped[str | None] = mapped_column(String(120))
+    malware: Mapped[str | None] = mapped_column(String(160))
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    reference_url: Mapped[str | None] = mapped_column(String(1000))
     first_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     actor: Mapped[Actor | None] = relationship(back_populates="indicators")
     source: Mapped[Source | None] = relationship(back_populates="indicators")
+    source_profiles: Mapped[list["IndicatorSource"]] = relationship(
+        back_populates="indicator", cascade="all, delete-orphan"
+    )
+
+
+class IndicatorSource(Base):
+    __tablename__ = "indicator_sources"
+    __table_args__ = (
+        UniqueConstraint("source_id", "external_id", name="uq_indicator_sources_external_identity"),
+        UniqueConstraint("indicator_id", "source_id", name="uq_indicator_sources_indicator_source"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    indicator_id: Mapped[int] = mapped_column(ForeignKey("indicators.id", ondelete="CASCADE"), index=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), index=True)
+    external_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    reference_url: Mapped[str | None] = mapped_column(String(1000))
+    confidence_score: Mapped[int | None] = mapped_column(Integer)
+    first_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    indicator: Mapped[Indicator] = relationship(back_populates="source_profiles")
+    source: Mapped[Source] = relationship(back_populates="indicator_profiles")
+
+    @property
+    def source_name(self) -> str:
+        return self.source.name
 
 
 class Report(Base):

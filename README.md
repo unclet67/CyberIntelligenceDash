@@ -16,6 +16,7 @@ operational reporting.
 - Browse threat-actor profiles, aliases, confidence, and attribution
 - Merge MITRE ATT&CK and Malpedia metadata into one actor profile
 - Preserve per-source external IDs, profile links, and last-sync timestamps
+- Ingest recent ThreatFox IOCs with confidence, malware, tags, and expiration
 - Explore campaigns by actor, sector, and status
 - Filter IP, domain, hash, and URL indicators
 - Review ATT&CK technique coverage and report metadata
@@ -27,7 +28,7 @@ operational reporting.
 ## Architecture
 
 ```text
-MITRE ATT&CK STIX       Malpedia actor API
+MITRE ATT&CK STIX   Malpedia actor API   ThreatFox IOC API
          \                  /
           v                v
        Source-aware ingestion and identity merge
@@ -65,24 +66,42 @@ python3 -m http.server 8000
 Open [http://127.0.0.1:8000](http://127.0.0.1:8000). API documentation is
 available at [http://127.0.0.1:8001/docs](http://127.0.0.1:8001/docs).
 
-## Sync threat actors
+## Sync live intelligence
 
-With the backend environment active, fetch and merge both official sources:
+MITRE and Malpedia can be synchronized without credentials:
 
 ```bash
 cd backend
-python -m app.worker --once --source all
+python -m app.worker --once --source mitre
+python -m app.worker --once --source malpedia
 ```
 
-You can sync only one source with `--source mitre` or `--source malpedia`.
-The default MITRE URL is the latest Enterprise ATT&CK STIX 2.1 bundle. The
-Malpedia actor metadata endpoints are public; an optional `MALPEDIA_API_TOKEN`
-is supported and is sent only by the backend.
+ThreatFox requires a free abuse.ch Auth-Key. Create one through the
+[abuse.ch Authentication Portal](https://auth.abuse.ch/), then place it in
+`backend/.env` without committing it:
+
+```dotenv
+ABUSECH_AUTH_KEY=your-auth-key
+THREATFOX_DAYS=7
+```
+
+Apply migrations and synchronize recent IOCs:
+
+```bash
+alembic upgrade head
+python -m app.worker --once --source threatfox
+```
+
+`--source all` synchronizes MITRE, Malpedia, and ThreatFox when the Auth-Key is
+configured. Without the key, the worker safely skips ThreatFox. The IOC API
+hides records after their six-month freshness window by default; use
+`include_inactive=true` only for historical review.
 
 Source documentation:
 
 - [MITRE ATT&CK STIX data](https://github.com/mitre-attack/attack-stix-data)
 - [Malpedia API](https://malpedia.caad.fkie.fraunhofer.de/usage/api)
+- [ThreatFox API](https://threatfox.abuse.ch/api/)
 
 ## Docker development
 
@@ -90,7 +109,7 @@ Source documentation:
 docker compose up --build
 ```
 
-Include the scheduled MITRE and Malpedia sync worker with:
+Include the scheduled actor and IOC synchronization worker with:
 
 ```bash
 docker compose --profile ingestion up --build
@@ -118,7 +137,7 @@ pytest
 ```
 
 The suite covers the API, seed collections, filters, authentication, frontend
-contract, STIX normalization, source-aware actor merging, audit records, and
+contract, STIX normalization, source-aware actor and IOC merging, freshness filtering, audit records, and
 idempotent ingestion.
 
 ## Project structure
@@ -142,7 +161,8 @@ idempotent ingestion.
 - Validate attribution, timestamps, confidence, and provenance before use.
 - Do not automatically visit indicators or execute referenced files.
 - Keep API tokens and database credentials out of Git and in a secret store.
-- Malpedia credentials are backend-only and are never sent to the dashboard.
+- Feed credentials are backend-only and are never sent to the dashboard.
+- Review confidence and age before operationally blocking any indicator.
 - Enable authentication, TLS, restricted CORS, and outbound allowlists in production.
 - Set `SEED_ON_STARTUP=false` before loading approved production data.
 - Back up PostgreSQL and monitor health and failed ingestion runs.
