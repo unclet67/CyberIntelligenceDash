@@ -60,15 +60,36 @@ class CampaignOut(APIModel):
     last_seen: date | None
 
 
+class IndicatorSourceOut(APIModel):
+    source_name: str
+    external_id: str
+    reference_url: str | None
+    confidence_score: int | None
+    first_seen: datetime | None
+    last_seen: datetime | None
+    expires_at: datetime | None
+    last_synced_at: datetime
+    is_active: bool
+
+
 class IndicatorOut(APIModel):
     id: int
     type: str
     value: str
     actor_id: str | None
     confidence: str
+    confidence_score: int | None = None
+    threat_type: str | None = None
+    malware: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    reference_url: str | None = None
     first_seen: datetime | None
     last_seen: datetime | None
+    expires_at: datetime | None = None
+    last_synced_at: datetime | None = None
+    is_active: bool = True
     source_name: str | None = None
+    source_profiles: list[IndicatorSourceOut] = Field(default_factory=list)
 
 
 class ReportOut(APIModel):

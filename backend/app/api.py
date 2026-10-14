@@ -1,10 +1,12 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, text
+from sqlalchemy import or_, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from .auth import require_api_token
 from .database import get_db
-from .models import Actor, ActorSource, Campaign, Indicator, IngestionRun, Report, Technique
+from .models import Actor, ActorSource, Campaign, Indicator, IndicatorSource, IngestionRun, Report, Technique
 from .schemas import (
     ActorDetail,
     ActorSummary,
@@ -27,6 +29,21 @@ def _actor_loading():
         selectinload(Actor.techniques),
         selectinload(Actor.events),
         selectinload(Actor.source_profiles).selectinload(ActorSource.source),
+    )
+
+
+def _indicator_loading():
+    return (
+        selectinload(Indicator.source),
+        selectinload(Indicator.source_profiles).selectinload(IndicatorSource.source),
+    )
+
+
+def _active_indicator_filter():
+    now = datetime.now(timezone.utc)
+    return (
+        Indicator.is_active.is_(True),
+        or_(Indicator.expires_at.is_(None), Indicator.expires_at > now),
     )
 
 
@@ -77,19 +94,23 @@ def list_campaigns(
 
 
 def _indicator_out(item: Indicator) -> IndicatorOut:
-    return IndicatorOut.model_validate(item).model_copy(
-        update={"source_name": item.source.name if item.source else None}
-    )
+    source_name = item.source.name if item.source else None
+    if item.source_profiles:
+        source_name = ", ".join(sorted({profile.source.name for profile in item.source_profiles}))
+    return IndicatorOut.model_validate(item).model_copy(update={"source_name": source_name})
 
 
 @data_router.get("/iocs", response_model=list[IndicatorOut])
 def list_indicators(
     indicator_type: str | None = Query(default=None, alias="type"),
     actor_id: str | None = None,
+    include_inactive: bool = False,
     limit: int = Query(default=100, ge=1, le=1000),
     session: Session = Depends(get_db),
 ) -> list[IndicatorOut]:
-    statement = select(Indicator).options(selectinload(Indicator.source)).order_by(Indicator.id.desc()).limit(limit)
+    statement = select(Indicator).options(*_indicator_loading()).order_by(Indicator.first_seen.desc()).limit(limit)
+    if not include_inactive:
+        statement = statement.where(*_active_indicator_filter())
     if indicator_type:
         statement = statement.where(Indicator.type == indicator_type.upper())
     if actor_id:
@@ -113,7 +134,10 @@ def dashboard_bootstrap(session: Session = Depends(get_db)) -> DashboardBootstra
     campaigns = list(session.scalars(select(Campaign).order_by(Campaign.name)))
     indicators = list(
         session.scalars(
-            select(Indicator).options(selectinload(Indicator.source)).order_by(Indicator.id.desc())
+            select(Indicator)
+            .options(*_indicator_loading())
+            .where(*_active_indicator_filter())
+            .order_by(Indicator.first_seen.desc())
         )
     )
     techniques = list(session.scalars(select(Technique).order_by(Technique.tactic, Technique.id)))

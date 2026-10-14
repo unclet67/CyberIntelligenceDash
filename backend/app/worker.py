@@ -9,7 +9,7 @@ import httpx
 
 from .config import settings
 from .database import Base, SessionLocal, engine
-from .ingestion import ingest_malpedia_actors, ingest_stix_bundle
+from .ingestion import ingest_malpedia_actors, ingest_stix_bundle, ingest_threatfox_iocs
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("argus.ingestion")
@@ -27,6 +27,23 @@ def fetch_json(url: str, *, api_token: str | None = None) -> Any:
     )
     response.raise_for_status()
     return response.json()
+
+
+def fetch_threatfox_payload() -> dict[str, Any]:
+    if not settings.abusech_auth_key:
+        raise ValueError("Set ABUSECH_AUTH_KEY before syncing ThreatFox")
+    response = httpx.post(
+        settings.threatfox_api_url,
+        headers={"Accept": "application/json", "Auth-Key": settings.abusech_auth_key},
+        json={"query": "get_iocs", "days": max(1, min(settings.threatfox_days, 7))},
+        timeout=settings.request_timeout_seconds,
+        follow_redirects=True,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise ValueError("ThreatFox returned an unexpected response")
+    return payload
 
 
 def load_bundle(*, file_path: str | None, url: str | None) -> tuple[dict[str, Any], str, str | None]:
@@ -54,6 +71,13 @@ def run_malpedia() -> None:
         logger.info("ingestion completed source=Malpedia seen=%s written=%s", run.items_seen, run.items_written)
 
 
+def run_threatfox() -> None:
+    payload = fetch_threatfox_payload()
+    with SessionLocal() as session:
+        run = ingest_threatfox_iocs(session, payload)
+        logger.info("ingestion completed source=ThreatFox seen=%s written=%s", run.items_seen, run.items_written)
+
+
 def run_selected(source: str, *, file_path: str | None = None, url: str | None = None) -> None:
     if file_path or source == "stix":
         run_stix(file_path=file_path, url=url or settings.stix_feed_url)
@@ -63,6 +87,10 @@ def run_selected(source: str, *, file_path: str | None = None, url: str | None =
         tasks.append(("MITRE ATT&CK", lambda: run_stix(url=url or settings.mitre_stix_url, source_name="MITRE ATT&CK")))
     if source in {"all", "malpedia"}:
         tasks.append(("Malpedia", run_malpedia))
+    if source == "threatfox" or (source == "all" and settings.abusech_auth_key):
+        tasks.append(("ThreatFox", run_threatfox))
+    elif source == "all":
+        logger.warning("skipping ThreatFox because ABUSECH_AUTH_KEY is not configured")
     failures = []
     for name, task in tasks:
         try:
@@ -76,10 +104,14 @@ def run_selected(source: str, *, file_path: str | None = None, url: str | None =
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Sync MITRE ATT&CK and Malpedia actor data into ARGUS TI")
-    parser.add_argument("--source", choices=("all", "mitre", "malpedia", "stix"), default="all")
+    parser = argparse.ArgumentParser(description="Sync actor and IOC intelligence into ARGUS TI")
+    parser.add_argument(
+        "--source",
+        choices=("all", "mitre", "malpedia", "threatfox", "stix"),
+        default="all",
+    )
     parser.add_argument("--file", help="Local STIX bundle JSON file")
-    parser.add_argument("--url", help="Override the selected remote URL")
+    parser.add_argument("--url", help="Override the selected STIX URL")
     parser.add_argument("--once", action="store_true", help="Run once instead of on an interval")
     parser.add_argument("--interval", type=int, default=settings.ingestion_interval_seconds)
     args = parser.parse_args()

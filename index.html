@@ -752,38 +752,51 @@ function renderIocs(){
     return `<div style="${style}" data-act="setIocFilter" data-id="${t}" tabindex="0" role="button">${t}</div>`;
   }).join('');
   const rows = iocsGlobal.filter(i=>state.iocTypeFilter==='All'||i.type===state.iocTypeFilter);
-  const bodyHtml = rows.length ? rows.map(i=>`
-    <div style="display:grid;grid-template-columns:0.7fr 2fr 1fr 1.3fr 1.2fr 1fr 1fr;gap:12px;padding:13px 20px;border-top:1px solid #f3f4f6;align-items:center;font-size:13px">
+  const latestSync = iocsGlobal.map(i=>i.syncedAt).filter(Boolean).sort().at(-1);
+  const freshness = latestSync ? `Last synchronized ${displayDateTime(latestSync)}` : 'Bundled demonstration data';
+  const bodyHtml = rows.length ? rows.map(i=>{
+    const expired = i.expiresAt && new Date(i.expiresAt).getTime() <= Date.now();
+    const active = i.isActive!==false && !expired;
+    const context = i.malware||i.threatType||'No malware attribution';
+    const detail = [i.threatType, ...(i.tags||[]).slice(0,2)].filter(value=>value&&value!==context).join(' · ');
+    return `
+    <div style="display:grid;grid-template-columns:0.65fr 2.2fr 1.45fr 0.9fr 1.1fr 1fr 0.75fr;gap:12px;padding:13px 20px;border-top:1px solid #f3f4f6;align-items:center;font-size:13px">
       <div style="font-size:11px;font-weight:600;color:${IOC_COLOR[i.type]||'#6b7280'}">${i.type}</div>
-      <div style="font-family:var(--mono);font-size:12.5px;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.value)}</div>
-      <div style="font-size:11px;font-weight:600;color:${confColor(i.confidence)}">${i.confidence}</div>
-      <div style="color:${accent};font-weight:500">${esc(i.actor)}</div>
-      <div style="color:#6b7280;font-size:12.5px">${esc(i.source)}</div>
-      <div style="color:#9ca3af;font-size:12px">${esc(i.firstSeen)}</div>
-      <div style="color:#9ca3af;font-size:12px">${esc(i.lastSeen)}</div>
-    </div>`).join('') : `
+      <div style="min-width:0">
+        <div style="font-family:var(--mono);font-size:12.5px;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(i.value)}">${esc(i.value)}</div>
+        <div style="font-size:10.5px;color:#9ca3af;margin-top:3px">${esc(i.actor)}</div>
+      </div>
+      <div style="min-width:0">
+        <div style="font-size:12.5px;color:#374151;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(context)}</div>
+        <div style="font-size:10.5px;color:#9ca3af;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(detail)}</div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:${confColor(i.confidence)}">${i.confidence}${Number.isInteger(i.confidenceScore)?` · ${i.confidenceScore}`:''}</div>
+      <div style="color:#6b7280;font-size:12px">${esc(i.source)}</div>
+      <div style="color:#9ca3af;font-size:12px">${esc(i.firstSeen||'Not reported')}</div>
+      <div><span style="${active?'background:#f0fdf4;color:#15803d':'background:#f3f4f6;color:#6b7280'};font-size:10.5px;font-weight:600;padding:3px 7px;border-radius:5px">${active?'ACTIVE':'EXPIRED'}</span></div>
+    </div>`;
+  }).join('') : `
     <div style="padding:56px 20px;text-align:center;color:#9ca3af">
-      <div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:4px">No indicators match this filter</div>
-      <div style="font-size:13px">Try a different indicator type or clear the search.</div>
+      <div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:4px">No active indicators match this filter</div>
+      <div style="font-size:13px">Try a different indicator type.</div>
     </div>`;
 
   return `<div>
     <div style="margin-bottom:20px">
-      <div style="font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-0.3px">Indicator Search</div>
-      <div style="font-size:13px;color:#6b7280;margin-top:4px">3,214 indicators tracked across all sources</div>
+      <div style="font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-0.3px">Live Indicators</div>
+      <div style="font-size:13px;color:#6b7280;margin-top:4px">${iocsGlobal.length} active indicators · ${esc(freshness)}</div>
     </div>
     <div style="${CARD};padding:20px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:8px;background:#f5f6f8;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;margin-bottom:16px">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
-        <span style="font-size:13px;color:#9ca3af;font-family:var(--mono)">Search by IP, domain, hash, or URL…</span>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${chips}</div>
+        <div style="font-size:11.5px;color:#9ca3af">Expired indicators are hidden by the API</div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">${chips}</div>
     </div>
     <div style="${CARD};overflow:hidden">
       <div style="overflow-x:auto">
-        <div style="min-width:820px">
-          <div style="display:grid;grid-template-columns:0.7fr 2fr 1fr 1.3fr 1.2fr 1fr 1fr;gap:12px;padding:14px 20px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid #f3f4f6">
-            <div>Type</div><div>Indicator</div><div>Confidence</div><div>Associated Actor</div><div>Source</div><div>First Seen</div><div>Last Seen</div>
+        <div style="min-width:980px">
+          <div style="display:grid;grid-template-columns:0.65fr 2.2fr 1.45fr 0.9fr 1.1fr 1fr 0.75fr;gap:12px;padding:14px 20px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid #f3f4f6">
+            <div>Type</div><div>Indicator</div><div>Malware / Threat</div><div>Confidence</div><div>Source</div><div>First Seen</div><div>Status</div>
           </div>
           ${bodyHtml}
         </div>
@@ -963,6 +976,11 @@ function displayDate(value){
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'});
 }
+function displayDateTime(value){
+  if(!value) return '';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString('en-US',{month:'short',day:'2-digit',hour:'numeric',minute:'2-digit'});
+}
 
 function storedApiToken(){
   try { return globalThis.sessionStorage?.getItem('argusApiToken') || ''; }
@@ -1042,9 +1060,17 @@ function applyBackendData(data){
     value:indicator.value,
     actor:actorNames.get(indicator.actor_id)||'Unattributed',
     confidence:indicator.confidence,
+    confidenceScore:indicator.confidence_score,
+    threatType:indicator.threat_type,
+    malware:indicator.malware,
+    tags:indicator.tags||[],
     source:indicator.source_name||'Unknown',
+    sourceProfiles:indicator.source_profiles||[],
     firstSeen:displayDate(indicator.first_seen),
-    lastSeen:displayDate(indicator.last_seen)
+    lastSeen:displayDate(indicator.last_seen),
+    expiresAt:indicator.expires_at,
+    syncedAt:indicator.last_synced_at,
+    isActive:indicator.is_active
   }));
 
   reportsList = data.reports.map(report=>({
